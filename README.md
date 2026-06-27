@@ -1,6 +1,6 @@
 # CodeLens MCP
 
-CodeLens MCP is a local, repo-aware Model Context Protocol (MCP) server that empowers LLM clients (like Claude Desktop) to perform semantic searches and answer questions about your codebase accurately, avoiding hallucinations. By leveraging local tree-sitter parsing and the lightweight `sqlite-vec` vector store, CodeLens delivers high-precision semantic code retrieval with zero infrastructure overhead.
+CodeLens MCP is a local, repo-aware Model Context Protocol (MCP) server that empowers the LLM client to perform semantic searches and answer questions about your codebase accurately, avoiding hallucinations. By leveraging local tree-sitter parsing and the lightweight `sqlite-vec` vector store, CodeLens delivers high-precision semantic code retrieval with zero infrastructure overhead.
 
 ## Architecture
 
@@ -9,7 +9,7 @@ graph TD
     A[Codebase] -->|Indexed via tree-sitter| B(Chunker)
     B -->|Splits by function/class| C(Embeddings: Gemini text-embedding-004)
     C -->|Vector Data| D[(sqlite-vec Store)]
-    E[LLM Client / Claude Desktop] -->|MCP stdio| F[CodeLens MCP Server]
+    E[The LLM Client] -->|MCP stdio| F[CodeLens MCP Server]
     F <-->|Query| D
     F -->|semantic_code_search| E
     F -->|find_usages| E
@@ -51,9 +51,9 @@ codelens index /path/to/your/repo
 ```
 This process uses incremental indexing: running it again will only re-embed files that have changed, saving API costs and time.
 
-## Claude Desktop Configuration
+## MCP Client Configuration
 
-To connect CodeLens MCP to Claude Desktop, add this to your `claude_desktop_config.json`:
+To connect CodeLens MCP to an MCP client, add this server to your MCP client's config file. For example:
 
 ```json
 {
@@ -72,7 +72,7 @@ To connect CodeLens MCP to Claude Desktop, add this to your `claude_desktop_conf
 
 ## Design Decisions
 
-- **MCP over Custom REST API**: Implementing the official Model Context Protocol (MCP) allows seamless integration with existing AI assistants like Claude Desktop without writing bespoke client-side glue code.
+- **MCP over Custom REST API**: Implementing the official Model Context Protocol (MCP) allows seamless integration with existing AI assistants and MCP clients without writing bespoke client-side glue code.
 - **sqlite-vec over Hosted Vector DB**: Since this is a local developer tool, requiring users to spin up Docker containers for Postgres or Chroma adds unnecessary friction. `sqlite-vec` provides fast, local, zero-infra vector search embedded directly into the application.
 - **tree-sitter over Fixed-Size Text Chunking**: Code semantics are lost when chunked arbitrarily by character count. By chunking at the function/class boundaries via `tree-sitter`, the vector embeddings capture logical boundaries, leading to vastly higher retrieval precision and context relevance.
 

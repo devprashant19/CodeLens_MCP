@@ -152,6 +152,14 @@ def run_eval():
     print("Starting Eval Harness...")
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
+        if os.path.exists(".env"):
+            with open(".env", "r") as f:
+                for line in f:
+                    if line.startswith("GEMINI_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip()
+                        break
+                        
+    if not api_key:
         print("GEMINI_API_KEY is not set. Cannot run evaluation.")
         return
 
@@ -180,6 +188,11 @@ def run_eval():
         print(f"[{idx+1}/20] Evaluating: {query}")
         
         try:
+            # We sleep for 12 seconds between requests to avoid the Gemini Free Tier rate limit 
+            # of 5 requests per minute (which allows ~1 request every 12 seconds).
+            import time
+            time.sleep(12)
+            
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=query,
@@ -230,8 +243,8 @@ def run_eval():
     print("| Query | Expected Tool | Actual Tool | Tool Pass | Args Pass |")
     print("|-------|---------------|-------------|-----------|-----------|")
     for r in results:
-        t_pass = "✅" if r["tool_pass"] else "❌"
-        a_pass = "✅" if r["args_pass"] else "❌"
+        t_pass = "PASS" if r["tool_pass"] else "FAIL"
+        a_pass = "PASS" if r["args_pass"] else "FAIL"
         print(f"| {r['query']} | {r['expected']} | {r['actual']} | {t_pass} | {a_pass} |")
         
     print(f"\n**Tool Selection Accuracy:** {correct_tools}/{len(EVAL_QUERIES)} ({(correct_tools/len(EVAL_QUERIES))*100:.1f}%)")

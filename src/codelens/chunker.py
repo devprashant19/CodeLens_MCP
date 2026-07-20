@@ -51,41 +51,41 @@ class Chunker:
             return []
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
+            with open(file_path, "rb") as f:
+                content_bytes = f.read()
         except Exception:
             # If we can't read the file (e.g. binary, permission error), skip it
             return []
 
-        if not content.strip():
+        if not content_bytes.strip():
             return []
 
-        tree = parser.parse(content.encode("utf-8"))
+        tree = parser.parse(content_bytes)
         if not tree or not tree.root_node:
             return []
             
         chunks = []
-        self._walk_tree(tree.root_node, content, file_path, None, chunks)
+        self._walk_tree(tree.root_node, content_bytes, file_path, None, chunks)
         
         # If no functions/classes were found, we might want to chunk the whole file as "module",
         # but the requirements specifically said "chunk by function/class, not fixed-size text blocks".
         # We'll return what we found.
         return chunks
 
-    def _walk_tree(self, node: Node, source: str, file_path: str, parent_symbol: Optional[str], chunks: List[Chunk]):
+    def _walk_tree(self, node: Node, source_bytes: bytes, file_path: str, parent_symbol: Optional[str], chunks: List[Chunk]):
         symbol_name = None
         symbol_type = None
 
         # Determine if this node is a class, function, or method
         if node.type in ("class_definition", "class_declaration"):
             symbol_type = "class"
-            symbol_name = self._get_node_name(node, source)
+            symbol_name = self._get_node_name(node, source_bytes)
         elif node.type in ("function_definition", "function_declaration", "method_definition", "arrow_function"):
             symbol_type = "method" if node.type == "method_definition" else "function"
-            symbol_name = self._get_node_name(node, source)
+            symbol_name = self._get_node_name(node, source_bytes)
             # If arrow function doesn't have a name in the node itself, maybe it's assigned to a variable
             if not symbol_name and node.parent and node.parent.type == "variable_declarator":
-                symbol_name = self._get_node_name(node.parent, source)
+                symbol_name = self._get_node_name(node.parent, source_bytes)
 
         # If it's a valid chunkable block, add it
         if symbol_name and symbol_type:
@@ -93,7 +93,7 @@ class Chunker:
             # Start and end lines are 0-indexed in tree-sitter, we add 1 for standard 1-based lines
             start_line = node.start_point[0] + 1
             end_line = node.end_point[0] + 1
-            code_text = source[node.start_byte:node.end_byte]
+            code_text = source_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
             
             chunks.append(Chunk(
                 file_path=file_path,
@@ -110,17 +110,17 @@ class Chunker:
 
         # Recursively walk children
         for child in node.children:
-            self._walk_tree(child, source, file_path, parent_symbol, chunks)
+            self._walk_tree(child, source_bytes, file_path, parent_symbol, chunks)
 
-    def _get_node_name(self, node: Node, source: str) -> Optional[str]:
+    def _get_node_name(self, node: Node, source_bytes: bytes) -> Optional[str]:
         # Typically, the name is an identifier child
         # tree-sitter python/js puts the name as a named child often called 'name'
         name_node = node.child_by_field_name("name")
         if name_node:
-            return source[name_node.start_byte:name_node.end_byte]
+            return source_bytes[name_node.start_byte:name_node.end_byte].decode("utf-8", errors="replace")
             
         # Fallback if no field name: search for identifier children
         for child in node.children:
             if child.type in ("identifier", "property_identifier"):
-                return source[child.start_byte:child.end_byte]
+                return source_bytes[child.start_byte:child.end_byte].decode("utf-8", errors="replace")
         return None

@@ -95,5 +95,41 @@ async def explain_function(file_path: str, function_name: str) -> str:
             
     return response
 
+@mcp.tool()
+@log_tool_call("exact_search")
+async def exact_search(query: str, limit: int = 10, file_filter: str = "") -> str:
+    """
+    Search the codebase for an exact text match.
+    Use this tool when you know the specific string, variable name, or hardcoded value you are looking for.
+    This is faster and more precise than semantic search for exact matches.
+    """
+    results = store.exact_search(query, limit=limit, file_filter=file_filter if file_filter else None)
+    if not results:
+        return f"No exact matches found for '{query}'."
+        
+    formatted_results = [format_chunk_result(r) for r in results]
+    return "\n---\n".join(formatted_results)
+
+@mcp.tool()
+@log_tool_call("get_file_structure")
+async def get_file_structure(file_path: str) -> str:
+    """
+    Get the outline of a file, showing all defined classes and functions.
+    Use this tool when you want to understand what a file contains without reading its entire source code.
+    Returns a list of symbols and their lines.
+    """
+    results = store.get_file_structure(file_path)
+    if not results:
+        return f"No parsable symbols found in {file_path}, or file does not exist."
+        
+    response = f"### Structure of {file_path}\n"
+    for r in results:
+        response += f"- Line {r['start_line']}-{r['end_line']}: {r['symbol_type']} `{r['symbol_name']}`"
+        if r['parent_symbol']:
+            response += f" (child of {r['parent_symbol']})"
+        response += "\n"
+        
+    return response
+
 if __name__ == "__main__":
     mcp.run()

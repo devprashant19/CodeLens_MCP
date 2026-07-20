@@ -18,7 +18,9 @@ def log_tool_call(tool_name: str):
             
             try:
                 result = await func(*args, **kwargs)
-                if isinstance(result, list):
+                if isinstance(result, str):
+                    result_count = 1
+                elif isinstance(result, list):
                     result_count = len(result)
                 elif hasattr(result, "__len__"):
                     result_count = len(result)

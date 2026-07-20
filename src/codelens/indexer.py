@@ -43,6 +43,7 @@ def index(repo_path: str):
     existing_hashes = store.get_file_hashes()
     
     files_to_process = []
+    files_on_disk = set()
     
     # Walk the directory
     for root, _, files in os.walk(repo_path):
@@ -60,6 +61,18 @@ def index(repo_path: str):
                 
             files_to_process.append(filepath)
             
+            # Keep track of relative path for cleanup
+            rel_path = os.path.relpath(filepath, repo_path)
+            files_on_disk.add(rel_path)
+            
+    # Cleanup files that were deleted from the repository
+    deleted_count = 0
+    for stored_file in existing_hashes:
+        if stored_file not in files_on_disk:
+            store.delete_file_chunks(stored_file)
+            console.print(f"[yellow]Removed deleted file from index: {stored_file}[/yellow]")
+            deleted_count += 1
+
     processed_count = 0
     skipped_count = 0
     
@@ -97,7 +110,7 @@ def index(repo_path: str):
         except Exception as e:
             console.print(f"[red]Error embedding chunks for {rel_path}: {e}[/red]")
             
-    console.print(f"[bold green]Indexing complete! processed={processed_count}, skipped_unchanged={skipped_count}[/bold green]")
+    console.print(f"[bold green]Indexing complete! processed={processed_count}, skipped={skipped_count}, deleted={deleted_count}[/bold green]")
 
 if __name__ == "__main__":
     cli()

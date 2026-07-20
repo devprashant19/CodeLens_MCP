@@ -109,6 +109,7 @@ class Store:
             query_json = json.dumps(query_embedding)
             
             # Base query joins vec_chunks with chunks
+            # By passing k = ?, sqlite-vec optimizes the nearest neighbor search
             sql = """
                 SELECT 
                     c.file_path, c.start_line, c.end_line, c.code_text, 
@@ -116,10 +117,10 @@ class Store:
                     v.distance
                 FROM vec_chunks v
                 JOIN chunks c ON c.id = v.rowid
-                WHERE v.embedding MATCH ?
+                WHERE v.embedding MATCH ? AND k = ?
             """
             
-            params = [query_json]
+            params = [query_json, top_k]
             if file_filter:
                 sql += " AND c.file_path LIKE ?"
                 params.append(f"%{file_filter}%")
@@ -199,3 +200,58 @@ class Store:
     def get_calls_to(self, symbol_name: str) -> List[Dict[str, Any]]:
         """Return chunks that contain calls to the given symbol (similar to usages)."""
         return self.find_usages(symbol_name)
+
+    def exact_search(self, query: str, limit: int = 10, file_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Exact text match search across the codebase."""
+        with self._get_connection() as conn:
+            sql = """
+                SELECT 
+                    file_path, start_line, end_line, code_text, 
+                    symbol_name, symbol_type, parent_symbol
+                FROM chunks 
+                WHERE code_text LIKE ?
+            """
+            params = [f"%{query}%"]
+            if file_filter:
+                sql += " AND file_path LIKE ?"
+                params.append(f"%{file_filter}%")
+                
+            sql += f" LIMIT {limit}"
+            
+            cursor = conn.execute(sql, params)
+            results = []
+            for row in cursor.fetchall():
+                results.append({
+                    "file_path": row[0],
+                    "start_line": row[1],
+                    "end_line": row[2],
+                    "code_text": row[3],
+                    "symbol_name": row[4],
+                    "symbol_type": row[5],
+                    "parent_symbol": row[6],
+                })
+            return results
+
+    def get_file_structure(self, file_path: str) -> List[Dict[str, Any]]:
+        """Returns all symbols defined in a file without the full code text to save context."""
+        with self._get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT 
+                    file_path, start_line, end_line, 
+                    symbol_name, symbol_type, parent_symbol
+                FROM chunks 
+                WHERE file_path = ?
+                ORDER BY start_line
+            """, (file_path,))
+            
+            results = []
+            for row in cursor.fetchall():
+                results.append({
+                    "file_path": row[0],
+                    "start_line": row[1],
+                    "end_line": row[2],
+                    "symbol_name": row[3],
+                    "symbol_type": row[4],
+                    "parent_symbol": row[5],
+                })
+            return results

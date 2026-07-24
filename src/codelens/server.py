@@ -6,6 +6,7 @@ from mcp.server.fastmcp import FastMCP
 from codelens.store import Store
 from codelens.embeddings import EmbeddingService
 from codelens.observability import log_tool_call
+from codelens.config import config
 
 mcp = FastMCP("CodeLens MCP", dependencies=["mcp", "google-genai", "sqlite-vec"])
 
@@ -36,7 +37,7 @@ def semantic_code_search(query: str, top_k: int = 5, file_filter: str = "") -> s
     if not embedding_service:
         return "Error: GEMINI_API_KEY is not set. Semantic search is disabled."
         
-    top_k = max(1, min(top_k, 20))
+    top_k = max(1, min(top_k, config.tool_max_results))
         
     try:
         # We need a synchronous-looking call since embed_chunks is sync, 
@@ -105,7 +106,7 @@ def exact_search(query: str, limit: int = 10, file_filter: str = "") -> str:
     Use this tool when you know the specific string, variable name, or hardcoded value you are looking for.
     This is faster and more precise than semantic search for exact matches.
     """
-    limit = max(1, min(limit, 20))
+    limit = max(1, min(limit, config.tool_max_results))
     results = store.exact_search(query, limit=limit, file_filter=file_filter if file_filter else None)
     if not results:
         return f"No exact matches found for '{query}'."

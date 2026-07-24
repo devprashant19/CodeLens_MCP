@@ -4,10 +4,11 @@ import sqlite_vec
 from typing import List, Dict, Any, Optional
 
 from codelens.chunker import Chunk
+from codelens.config import config
 
 class Store:
-    def __init__(self, db_path: str = "codelens.sqlite"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or config.db_path
         self._init_db()
 
     def _get_connection(self):
@@ -43,10 +44,9 @@ class Store:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_symbol_name ON chunks(symbol_name)")
             
             # Vector table (sqlite-vec uses virtual tables)
-            # 768 is the default dimension for Gemini text-embedding-004
-            conn.execute("""
+            conn.execute(f"""
                 CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
-                    embedding float[768]
+                    embedding float[{config.embedding_dim}]
                 )
             """)
             conn.commit()

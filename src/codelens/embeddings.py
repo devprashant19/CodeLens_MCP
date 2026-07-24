@@ -2,15 +2,16 @@ import os
 import time
 from typing import List, Optional
 from google import genai
+from codelens.config import config
 
 class EmbeddingService:
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
+        self.api_key = api_key or config.api_key
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY environment variable is missing")
         self.client = genai.Client(api_key=self.api_key)
-        self.model_name = "text-embedding-004"
-        self.batch_size = 50
+        self.model_name = config.embedding_model
+        self.batch_size = config.embedding_batch_size
 
     def embed_chunks(self, texts: List[str]) -> List[List[float]]:
         """
@@ -47,10 +48,8 @@ class EmbeddingService:
                 elif "400" in str(e) or "invalid argument" in str(e).lower():
                     # Likely a payload too large / token limit error.
                     # We can try to truncate the texts to a safe limit.
-                    # Gemini text-embedding-004 limit is around 2048 tokens ~ 8000 chars.
-                    # We'll do a naive truncation if it failed with 400.
                     print("400 Bad Request encountered (likely token limit). Truncating chunks...")
-                    texts = [t[:8000] for t in texts]
+                    texts = [t[:config.truncation_limit] for t in texts]
                 else:
                     # If it's a different error, raise immediately
                     raise e

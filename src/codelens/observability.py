@@ -7,13 +7,19 @@ from logging.handlers import RotatingFileHandler
 from datetime import datetime
 from typing import Any, Callable
 
-LOG_FILE = "logs/tool_calls.jsonl"
-os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+from codelens.config import config
+
+os.makedirs(os.path.dirname(config.log_file), exist_ok=True)
 
 logger = logging.getLogger("codelens_tool_calls")
 logger.setLevel(logging.INFO)
-# 5MB max bytes, keep 3 backups
-handler = RotatingFileHandler(LOG_FILE, maxBytes=5*1024*1024, backupCount=3, encoding="utf-8")
+
+handler = RotatingFileHandler(
+    config.log_file, 
+    maxBytes=config.log_max_bytes, 
+    backupCount=config.log_backup_count, 
+    encoding="utf-8"
+)
 handler.setFormatter(logging.Formatter("%(message)s"))
 if not logger.handlers:
     logger.addHandler(handler)

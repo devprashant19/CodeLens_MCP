@@ -27,12 +27,12 @@ class MyClass:
         chunks = chunker.chunk_file(path)
         assert len(chunks) == 3
         
-        # We should find hello_world, MyClass, and method_one
+        # We should find hello_world, MyClass, and MyClass.method_one
         names = {c.symbol_name for c in chunks}
-        assert names == {"hello_world", "MyClass", "method_one"}
+        assert names == {"hello_world", "MyClass", "MyClass.method_one"}
         
         # Check parents
-        method_chunk = next(c for c in chunks if c.symbol_name == "method_one")
+        method_chunk = next(c for c in chunks if c.symbol_name == "MyClass.method_one")
         assert method_chunk.parent_symbol == "MyClass"
         assert method_chunk.symbol_type == "function" # Or method, depending on tree-sitter
     finally:
@@ -49,7 +49,7 @@ def outer():
     try:
         chunks = chunker.chunk_file(path)
         assert len(chunks) == 2
-        inner = next(c for c in chunks if c.symbol_name == "inner")
+        inner = next(c for c in chunks if c.symbol_name == "outer.inner")
         assert inner.parent_symbol == "outer"
     finally:
         os.remove(path)
@@ -98,7 +98,7 @@ function process() {
         chunks = chunker.chunk_file(path)
         names = {c.symbol_name for c in chunks if c.symbol_name}
         assert "User" in names
-        assert "login" in names
+        assert "User.login" in names
         assert "process" in names
     finally:
         os.remove(path)

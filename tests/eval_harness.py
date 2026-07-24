@@ -44,7 +44,42 @@ explain_function_schema = {
     }
 }
 
-# 20 Queries
+exact_search_schema = {
+    "name": "exact_search",
+    "description": "Search the codebase for an exact text match. Use this tool when you know the specific string, variable name, or hardcoded value you are looking for.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "The exact text to search for"},
+            "limit": {"type": "integer", "description": "Maximum number of results to return"},
+            "file_filter": {"type": "string", "description": "Optional file path filter"}
+        },
+        "required": ["query"]
+    }
+}
+
+get_file_structure_schema = {
+    "name": "get_file_structure",
+    "description": "Get the outline of a file, showing all defined classes and functions. Use this tool when you want to understand what a file contains without reading its entire source code.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "file_path": {"type": "string", "description": "Path to the file to outline"}
+        },
+        "required": ["file_path"]
+    }
+}
+
+get_repo_map_schema = {
+    "name": "get_repo_map",
+    "description": "Get a list of all files currently indexed in the repository. Use this tool when you need to see what files exist in the project to explore the codebase.",
+    "parameters": {
+        "type": "object",
+        "properties": {}
+    }
+}
+
+# 26 Queries
 EVAL_QUERIES = [
     {
         "query": "Where is the tree-sitter chunking logic implemented?",
@@ -145,6 +180,36 @@ EVAL_QUERIES = [
         "query": "Find usages of EmbeddingService.",
         "expected_tool": "find_usages",
         "expected_args_contain": ["EmbeddingService"]
+    },
+    {
+        "query": "Find the exact string 'PRAGMA journal_mode'",
+        "expected_tool": "exact_search",
+        "expected_args_contain": ["PRAGMA journal_mode"]
+    },
+    {
+        "query": "What files exist in the repository?",
+        "expected_tool": "get_repo_map",
+        "expected_args_contain": []
+    },
+    {
+        "query": "Show me the outline of store.py",
+        "expected_tool": "get_file_structure",
+        "expected_args_contain": ["store.py"]
+    },
+    {
+        "query": "Find the exact text 'google-genai' in the codebase",
+        "expected_tool": "exact_search",
+        "expected_args_contain": ["google-genai"]
+    },
+    {
+        "query": "List all files indexed by the system.",
+        "expected_tool": "get_repo_map",
+        "expected_args_contain": []
+    },
+    {
+        "query": "What classes and functions are defined in chunker.py?",
+        "expected_tool": "get_file_structure",
+        "expected_args_contain": ["chunker.py"]
     }
 ]
 
@@ -172,7 +237,10 @@ def run_eval():
     tool_defs = [
         types.FunctionDeclaration(**semantic_search_schema),
         types.FunctionDeclaration(**find_usages_schema),
-        types.FunctionDeclaration(**explain_function_schema)
+        types.FunctionDeclaration(**explain_function_schema),
+        types.FunctionDeclaration(**exact_search_schema),
+        types.FunctionDeclaration(**get_file_structure_schema),
+        types.FunctionDeclaration(**get_repo_map_schema)
     ]
     gemini_tools = [types.Tool(function_declarations=tool_defs)]
 
@@ -185,7 +253,7 @@ def run_eval():
         expected_tool = eval_item["expected_tool"]
         expected_args_keywords = eval_item["expected_args_contain"]
         
-        print(f"[{idx+1}/20] Evaluating: {query}")
+        print(f"[{idx+1}/26] Evaluating: {query}")
         
         try:
             # We sleep for 12 seconds between requests to avoid the Gemini Free Tier rate limit 

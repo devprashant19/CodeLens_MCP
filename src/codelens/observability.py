@@ -2,22 +2,33 @@ import time
 import json
 import os
 import functools
+import logging
+from logging.handlers import RotatingFileHandler
 from datetime import datetime
 from typing import Any, Callable
 
 LOG_FILE = "logs/tool_calls.jsonl"
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+logger = logging.getLogger("codelens_tool_calls")
+logger.setLevel(logging.INFO)
+# 5MB max bytes, keep 3 backups
+handler = RotatingFileHandler(LOG_FILE, maxBytes=5*1024*1024, backupCount=3, encoding="utf-8")
+handler.setFormatter(logging.Formatter("%(message)s"))
+if not logger.handlers:
+    logger.addHandler(handler)
 
 def log_tool_call(tool_name: str):
     def decorator(func: Callable):
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs):
             start_time = time.time()
             success = True
             result_count = 0
             error_msg = None
             
             try:
-                result = await func(*args, **kwargs)
+                result = func(*args, **kwargs)
                 if isinstance(result, str):
                     result_count = 1
                 elif isinstance(result, list):
@@ -47,9 +58,7 @@ def log_tool_call(tool_name: str):
                     "error": error_msg
                 }
                 
-                os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-                with open(LOG_FILE, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(log_entry) + "\n")
+                logger.info(json.dumps(log_entry))
                     
         return wrapper
     return decorator

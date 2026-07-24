@@ -89,6 +89,11 @@ class Chunker:
 
         # If it's a valid chunkable block, add it
         if symbol_name and symbol_type:
+            if parent_symbol:
+                full_symbol_name = f"{parent_symbol}.{symbol_name}"
+            else:
+                full_symbol_name = symbol_name
+                
             # Get the exact text of the node
             # Start and end lines are 0-indexed in tree-sitter, we add 1 for standard 1-based lines
             start_line = node.start_point[0] + 1
@@ -100,12 +105,12 @@ class Chunker:
                 start_line=start_line,
                 end_line=end_line,
                 code_text=code_text,
-                symbol_name=symbol_name,
+                symbol_name=full_symbol_name,
                 symbol_type=symbol_type,
                 parent_symbol=parent_symbol
             ))
 
-            # The new parent for children is this symbol
+            # The new parent for children is this symbol (raw name)
             parent_symbol = symbol_name
 
         # Recursively walk children

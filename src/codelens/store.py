@@ -2,10 +2,11 @@ import sqlite3
 import json
 import sqlite_vec
 import threading
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 from codelens.chunker import Chunk
 from codelens.config import config
+from codelens.models import ChunkResult, SearchResult, StructureEntry
 
 class Store:
     def __init__(self, db_path: str = None):
@@ -54,12 +55,23 @@ class Store:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_symbol_name ON chunks(symbol_name)")
             
             # Vector table (sqlite-vec uses virtual tables)
-            conn.execute(f"""
+            conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
-                    embedding float[{config.embedding_dim}]
+                    embedding float[%s]
                 )
-            """)
+            """ % config.embedding_dim)
             conn.commit()
+
+    def _row_to_chunk_result(self, row: tuple) -> ChunkResult:
+        return ChunkResult(
+            file_path=row[0],
+            start_line=row[1],
+            end_line=row[2],
+            code_text=row[3],
+            symbol_name=row[4],
+            symbol_type=row[5],
+            parent_symbol=row[6]
+        )
 
     def get_file_hashes(self) -> Dict[str, str]:
         """Returns a mapping of file_path -> file_hash for incremental indexing."""
@@ -110,17 +122,14 @@ class Store:
                 
             conn.commit()
 
-    def vector_search(self, query_embedding: List[float], top_k: int = 5, file_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+    def vector_search(self, query_embedding: List[float], top_k: int = 5, file_filter: Optional[str] = None) -> List[SearchResult]:
         """
         Cosine similarity search using sqlite-vec.
         Returns ranked chunks.
         """
         with self._get_connection() as conn:
-            # Serialize the query embedding
             query_json = json.dumps(query_embedding)
             
-            # Base query joins vec_chunks with chunks
-            # By passing k = ?, sqlite-vec optimizes the nearest neighbor search
             sql = """
                 SELECT 
                     c.file_path, c.start_line, c.end_line, c.code_text, 
@@ -136,29 +145,28 @@ class Store:
                 sql += " AND c.file_path LIKE ?"
                 params.append(f"%{file_filter}%")
                 
-            sql += f" ORDER BY v.distance LIMIT {top_k}"
+            sql += " ORDER BY v.distance LIMIT ?"
+            params.append(top_k)
             
             cursor = conn.execute(sql, params)
             results = []
             for row in cursor.fetchall():
-                results.append({
-                    "file_path": row[0],
-                    "start_line": row[1],
-                    "end_line": row[2],
-                    "code_text": row[3],
-                    "symbol_name": row[4],
-                    "symbol_type": row[5],
-                    "parent_symbol": row[6],
-                    "distance": row[7],
-                    "relevance_score": max(0.0, 1.0 - row[7]) # Simple conversion of distance to score
-                })
+                results.append(SearchResult(
+                    file_path=row[0],
+                    start_line=row[1],
+                    end_line=row[2],
+                    code_text=row[3],
+                    symbol_name=row[4],
+                    symbol_type=row[5],
+                    parent_symbol=row[6],
+                    distance=row[7],
+                    relevance_score=max(0.0, 1.0 - row[7])
+                ))
             return results
 
-    def find_usages(self, symbol_name: str) -> List[Dict[str, Any]]:
+    def find_usages(self, symbol_name: str) -> List[ChunkResult]:
         """
         Exact text/AST reference matching.
-        For now, does a naive text search in code_text for the symbol_name, 
-        but excludes the definition chunk itself (where symbol_name matches exactly).
         """
         with self._get_connection() as conn:
             cursor = conn.execute("""
@@ -169,20 +177,9 @@ class Store:
                 WHERE code_text LIKE ? AND symbol_name != ? AND symbol_name NOT LIKE ?
             """, (f"%{symbol_name}%", symbol_name, f"%.{symbol_name}"))
             
-            results = []
-            for row in cursor.fetchall():
-                results.append({
-                    "file_path": row[0],
-                    "start_line": row[1],
-                    "end_line": row[2],
-                    "code_text": row[3],
-                    "symbol_name": row[4],
-                    "symbol_type": row[5],
-                    "parent_symbol": row[6],
-                })
-            return results
+            return [self._row_to_chunk_result(row) for row in cursor.fetchall()]
 
-    def get_chunk_by_symbol(self, file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
+    def get_chunk_by_symbol(self, file_path: str, symbol_name: str) -> Optional[ChunkResult]:
         """Get a specific chunk by its defined symbol name and file."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
@@ -198,21 +195,13 @@ class Store:
             if not row:
                 return None
                 
-            return {
-                "file_path": row[0],
-                "start_line": row[1],
-                "end_line": row[2],
-                "code_text": row[3],
-                "symbol_name": row[4],
-                "symbol_type": row[5],
-                "parent_symbol": row[6],
-            }
+            return self._row_to_chunk_result(row)
 
-    def get_calls_to(self, symbol_name: str) -> List[Dict[str, Any]]:
+    def get_calls_to(self, symbol_name: str) -> List[ChunkResult]:
         """Return chunks that contain calls to the given symbol (similar to usages)."""
         return self.find_usages(symbol_name)
 
-    def exact_search(self, query: str, limit: int = 10, file_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+    def exact_search(self, query: str, limit: int = 10, file_filter: Optional[str] = None) -> List[ChunkResult]:
         """Exact text match search across the codebase."""
         with self._get_connection() as conn:
             sql = """
@@ -227,23 +216,13 @@ class Store:
                 sql += " AND file_path LIKE ?"
                 params.append(f"%{file_filter}%")
                 
-            sql += f" LIMIT {limit}"
+            sql += " LIMIT ?"
+            params.append(limit)
             
             cursor = conn.execute(sql, params)
-            results = []
-            for row in cursor.fetchall():
-                results.append({
-                    "file_path": row[0],
-                    "start_line": row[1],
-                    "end_line": row[2],
-                    "code_text": row[3],
-                    "symbol_name": row[4],
-                    "symbol_type": row[5],
-                    "parent_symbol": row[6],
-                })
-            return results
+            return [self._row_to_chunk_result(row) for row in cursor.fetchall()]
 
-    def get_file_structure(self, file_path: str) -> List[Dict[str, Any]]:
+    def get_file_structure(self, file_path: str) -> List[StructureEntry]:
         """Returns all symbols defined in a file without the full code text to save context."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
@@ -257,14 +236,14 @@ class Store:
             
             results = []
             for row in cursor.fetchall():
-                results.append({
-                    "file_path": row[0],
-                    "start_line": row[1],
-                    "end_line": row[2],
-                    "symbol_name": row[3],
-                    "symbol_type": row[4],
-                    "parent_symbol": row[5],
-                })
+                results.append(StructureEntry(
+                    file_path=row[0],
+                    start_line=row[1],
+                    end_line=row[2],
+                    symbol_name=row[3],
+                    symbol_type=row[4],
+                    parent_symbol=row[5]
+                ))
             return results
 
     def get_repo_map(self) -> List[str]:

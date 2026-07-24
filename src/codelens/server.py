@@ -20,12 +20,14 @@ except ValueError:
     # Allows the server to start, but semantic search will fail cleanly if API key is missing
     embedding_service = None
 
-def format_chunk_result(chunk: dict) -> str:
-    res = f"File: {chunk['file_path']} (Lines {chunk['start_line']}-{chunk['end_line']})\n"
-    res += f"Symbol: {chunk['symbol_name']} ({chunk['symbol_type']})\n"
-    if chunk.get('relevance_score'):
-        res += f"Relevance: {chunk['relevance_score']:.3f}\n"
-    res += f"Code:\n```\n{chunk['code_text']}\n```\n"
+from codelens.models import ChunkResult, SearchResult
+
+def format_chunk_result(chunk: ChunkResult) -> str:
+    res = f"File: {chunk.file_path} (Lines {chunk.start_line}-{chunk.end_line})\n"
+    res += f"Symbol: {chunk.symbol_name} ({chunk.symbol_type})\n"
+    if isinstance(chunk, SearchResult) and hasattr(chunk, 'relevance_score'):
+        res += f"Relevance: {chunk.relevance_score:.3f}\n"
+    res += f"Code:\n```\n{chunk.code_text}\n```\n"
     return res
 
 @mcp.tool()
@@ -131,9 +133,9 @@ def get_file_structure(file_path: str) -> str:
         
     response = f"### Structure of {file_path}\n"
     for r in results:
-        response += f"- Line {r['start_line']}-{r['end_line']}: {r['symbol_type']} `{r['symbol_name']}`"
-        if r['parent_symbol']:
-            response += f" (child of {r['parent_symbol']})"
+        response += f"- Line {r.start_line}-{r.end_line}: {r.symbol_type} `{r.symbol_name}`"
+        if r.parent_symbol:
+            response += f" (child of {r.parent_symbol})"
         response += "\n"
         
     return response

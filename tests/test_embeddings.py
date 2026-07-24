@@ -1,13 +1,6 @@
 import pytest
-import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from codelens.embeddings import EmbeddingService
-
-@pytest.fixture
-def mock_genai_client():
-    with patch('codelens.embeddings.genai.Client') as MockClient:
-        mock_client = MockClient.return_value
-        yield mock_client
 
 def test_embed_chunks_batching(mock_genai_client):
     service = EmbeddingService(api_key="fake")

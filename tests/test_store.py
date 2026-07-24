@@ -1,19 +1,5 @@
 import pytest
-import os
-import tempfile
-from codelens.store import Store
 from codelens.chunker import Chunk
-
-@pytest.fixture
-def store():
-    fd, path = tempfile.mkstemp(suffix=".sqlite")
-    os.close(fd)
-    
-    store = Store(db_path=path)
-    yield store
-    
-    store._get_connection().close()
-    os.remove(path)
 
 def test_insert_and_get_hashes(store):
     chunks = [

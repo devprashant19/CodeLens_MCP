@@ -26,7 +26,7 @@ def format_chunk_result(chunk: dict) -> str:
 
 @mcp.tool()
 @log_tool_call("semantic_code_search")
-async def semantic_code_search(query: str, top_k: int = 5, file_filter: str = "") -> str:
+def semantic_code_search(query: str, top_k: int = 5, file_filter: str = "") -> str:
     """
     Search the codebase using semantic vector search.
     Use this tool when you need to understand conceptual ideas, find how something works generally, 
@@ -35,6 +35,8 @@ async def semantic_code_search(query: str, top_k: int = 5, file_filter: str = ""
     """
     if not embedding_service:
         return "Error: GEMINI_API_KEY is not set. Semantic search is disabled."
+        
+    top_k = max(1, min(top_k, 20))
         
     try:
         # We need a synchronous-looking call since embed_chunks is sync, 
@@ -57,7 +59,7 @@ async def semantic_code_search(query: str, top_k: int = 5, file_filter: str = ""
 
 @mcp.tool()
 @log_tool_call("find_usages")
-async def find_usages(symbol_name: str) -> str:
+def find_usages(symbol_name: str) -> str:
     """
     Find all references and usages of a specific function, class, or variable name.
     Use this tool when you know the exact name of a symbol and want to see where else in the codebase it is called or referenced.
@@ -72,7 +74,7 @@ async def find_usages(symbol_name: str) -> str:
 
 @mcp.tool()
 @log_tool_call("explain_function")
-async def explain_function(file_path: str, function_name: str) -> str:
+def explain_function(file_path: str, function_name: str) -> str:
     """
     Get the full context of a function to explain its role.
     This returns the function's own code plus chunks that call it, giving you surrounding context
@@ -97,12 +99,13 @@ async def explain_function(file_path: str, function_name: str) -> str:
 
 @mcp.tool()
 @log_tool_call("exact_search")
-async def exact_search(query: str, limit: int = 10, file_filter: str = "") -> str:
+def exact_search(query: str, limit: int = 10, file_filter: str = "") -> str:
     """
     Search the codebase for an exact text match.
     Use this tool when you know the specific string, variable name, or hardcoded value you are looking for.
     This is faster and more precise than semantic search for exact matches.
     """
+    limit = max(1, min(limit, 20))
     results = store.exact_search(query, limit=limit, file_filter=file_filter if file_filter else None)
     if not results:
         return f"No exact matches found for '{query}'."
@@ -112,7 +115,7 @@ async def exact_search(query: str, limit: int = 10, file_filter: str = "") -> st
 
 @mcp.tool()
 @log_tool_call("get_file_structure")
-async def get_file_structure(file_path: str) -> str:
+def get_file_structure(file_path: str) -> str:
     """
     Get the outline of a file, showing all defined classes and functions.
     Use this tool when you want to understand what a file contains without reading its entire source code.
@@ -129,6 +132,22 @@ async def get_file_structure(file_path: str) -> str:
             response += f" (child of {r['parent_symbol']})"
         response += "\n"
         
+    return response
+
+@mcp.tool()
+@log_tool_call("get_repo_map")
+def get_repo_map() -> str:
+    """
+    Get a list of all files currently indexed in the repository.
+    Use this tool when you need to see what files exist in the project to explore the codebase.
+    """
+    files = store.get_repo_map()
+    if not files:
+        return "The repository is currently empty or has not been indexed."
+        
+    response = "### Repository Map\n"
+    for f in files:
+        response += f"- {f}\n"
     return response
 
 if __name__ == "__main__":

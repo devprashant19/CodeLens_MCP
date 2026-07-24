@@ -44,6 +44,13 @@ class EmbeddingService:
                     print(f"Rate limited by Gemini API. Retrying in {delay} seconds...")
                     time.sleep(delay)
                     delay *= 2  # Exponential backoff
+                elif "400" in str(e) or "invalid argument" in str(e).lower():
+                    # Likely a payload too large / token limit error.
+                    # We can try to truncate the texts to a safe limit.
+                    # Gemini text-embedding-004 limit is around 2048 tokens ~ 8000 chars.
+                    # We'll do a naive truncation if it failed with 400.
+                    print("400 Bad Request encountered (likely token limit). Truncating chunks...")
+                    texts = [t[:8000] for t in texts]
                 else:
                     # If it's a different error, raise immediately
                     raise e

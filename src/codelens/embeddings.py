@@ -4,6 +4,7 @@ from typing import List, Optional
 from google import genai
 from codelens.config import config
 from codelens.logging_config import get_logger
+from codelens.exceptions import EmbeddingError, RateLimitError, PayloadTooLargeError
 
 logger = get_logger("embeddings")
 
@@ -44,7 +45,7 @@ class EmbeddingService:
                 # Basic check for rate limit or quota exceeded
                 if "429" in str(e) or "quota" in str(e).lower() or "rate" in str(e).lower():
                     if attempt == max_retries - 1:
-                        raise e
+                        raise RateLimitError(f"Rate limited by Gemini API: {e}")
                     logger.warning(f"Rate limited by Gemini API. Retrying in {delay} seconds...")
                     time.sleep(delay)
                     delay *= 2  # Exponential backoff
@@ -55,5 +56,5 @@ class EmbeddingService:
                     texts = [t[:config.truncation_limit] for t in texts]
                 else:
                     # If it's a different error, raise immediately
-                    raise e
-        return []
+                    raise EmbeddingError(f"Embedding API failed: {e}")
+        raise EmbeddingError("Failed to embed chunks after max retries")

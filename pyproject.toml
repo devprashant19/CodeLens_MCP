@@ -26,3 +26,4 @@ dev = [
 
 [project.scripts]
 codelens = "codelens.indexer:cli"
+codelens-analytics = "codelens.analytics:cli"

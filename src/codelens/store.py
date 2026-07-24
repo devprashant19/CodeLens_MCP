@@ -11,9 +11,10 @@ class Store:
         self._init_db()
 
     def _get_connection(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         # Enable foreign keys and other pragmas if needed
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         # Load sqlite-vec extension
         conn.enable_load_extension(True)
         sqlite_vec.load(conn)
@@ -155,8 +156,8 @@ class Store:
                     file_path, start_line, end_line, code_text, 
                     symbol_name, symbol_type, parent_symbol
                 FROM chunks 
-                WHERE code_text LIKE ? AND symbol_name != ?
-            """, (f"%{symbol_name}%", symbol_name))
+                WHERE code_text LIKE ? AND symbol_name != ? AND symbol_name NOT LIKE ?
+            """, (f"%{symbol_name}%", symbol_name, f"%.{symbol_name}"))
             
             results = []
             for row in cursor.fetchall():
@@ -179,9 +180,9 @@ class Store:
                     file_path, start_line, end_line, code_text, 
                     symbol_name, symbol_type, parent_symbol
                 FROM chunks 
-                WHERE file_path = ? AND symbol_name = ?
+                WHERE file_path = ? AND (symbol_name = ? OR symbol_name LIKE ?)
                 LIMIT 1
-            """, (file_path, symbol_name))
+            """, (file_path, symbol_name, f"%.{symbol_name}"))
             
             row = cursor.fetchone()
             if not row:
@@ -255,3 +256,9 @@ class Store:
                     "parent_symbol": row[5],
                 })
             return results
+
+    def get_repo_map(self) -> List[str]:
+        """Returns all unique indexed file paths."""
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT DISTINCT file_path FROM chunks ORDER BY file_path")
+            return [row[0] for row in cursor.fetchall()]

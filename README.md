@@ -14,6 +14,9 @@ graph TD
     F -->|semantic_code_search| E
     F -->|find_usages| E
     F -->|explain_function| E
+    F -->|exact_search| E
+    F -->|get_file_structure| E
+    F -->|get_repo_map| E
 ```
 
 ## Setup & Installation
@@ -51,6 +54,16 @@ codelens index /path/to/your/repo
 ```
 This process uses incremental indexing: running it again will only re-embed files that have changed, saving API costs and time.
 
+### Docker Deployment (Scalable)
+
+For a fully isolated and scalable environment, you can run CodeLens MCP using Docker:
+
+```bash
+docker build -t codelens-mcp .
+# Run the MCP server, mounting the codebase into /repo for indexing
+docker run -i --rm -e GEMINI_API_KEY=your_key -v /path/to/your/repo:/repo codelens-mcp
+```
+
 ## MCP Client Configuration
 
 To connect CodeLens MCP to an MCP client, add this server to your MCP client's config file. For example:
@@ -78,12 +91,12 @@ To connect CodeLens MCP to an MCP client, add this server to your MCP client's c
 
 ## Evaluation Harness Results
 
-We run an automated evaluation harness testing 20 natural-language queries to ensure the LLM correctly selects the right tools and arguments based solely on their descriptions.
+We run an automated evaluation harness testing 26 natural-language queries to ensure the LLM correctly selects the right tools and arguments based solely on their descriptions.
 
 | Metric | Accuracy |
 |--------|----------|
-| **Tool Selection Accuracy** | **100% (20/20)** |
-| **Argument Extraction Accuracy** | **100% (20/20)** |
+| **Tool Selection Accuracy** | **100% (26/26)** |
+| **Argument Extraction Accuracy** | **100% (26/26)** |
 
 *(Simulated using Gemini 2.5 Flash as the tool-calling client. See `tests/eval_harness.py` for full details.)*
 

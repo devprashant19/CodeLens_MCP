@@ -1,17 +1,24 @@
 import json
 import os
+import argparse
+from datetime import datetime, timedelta
 from collections import defaultdict
 from rich.console import Console
 from rich.table import Table
 
 LOG_FILE = "logs/tool_calls.jsonl"
 
-def analyze_logs():
+def analyze_logs(days: int = None):
     console = Console()
     
     if not os.path.exists(LOG_FILE):
         console.print(f"[red]Log file {LOG_FILE} not found.[/red]")
         return
+        
+    cutoff_date = None
+    if days is not None:
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        console.print(f"[cyan]Filtering logs to the last {days} days (since {cutoff_date.date()})[/cyan]")
         
     total_calls = 0
     success_calls = 0
@@ -30,6 +37,18 @@ def analyze_logs():
                 continue
             try:
                 entry = json.loads(line)
+                
+                if cutoff_date:
+                    ts_str = entry.get("timestamp", "").replace("Z", "")
+                    if ts_str:
+                        try:
+                            # Handle parsing ISO format
+                            entry_date = datetime.fromisoformat(ts_str)
+                            if entry_date < cutoff_date:
+                                continue
+                        except ValueError:
+                            pass
+                            
                 total_calls += 1
                 
                 tool_name = entry.get("tool_name", "unknown")
@@ -88,4 +107,7 @@ def analyze_logs():
             console.print(f"- '{q}' ({count} times)")
 
 if __name__ == "__main__":
-    analyze_logs()
+    parser = argparse.ArgumentParser(description="Analyze CodeLens MCP logs")
+    parser.add_argument("--days", type=int, default=None, help="Filter to the last N days")
+    args = parser.parse_args()
+    analyze_logs(days=args.days)

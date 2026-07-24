@@ -14,8 +14,7 @@ def mock_embeddings():
     with patch('codelens.server.embedding_service') as mock:
         yield mock
 
-@pytest.mark.asyncio
-async def test_semantic_code_search(mock_store, mock_embeddings):
+def test_semantic_code_search(mock_store, mock_embeddings):
     from codelens.server import semantic_code_search
     
     mock_embeddings.embed_chunks.return_value = [[0.1, 0.2, 0.3]]
@@ -31,13 +30,12 @@ async def test_semantic_code_search(mock_store, mock_embeddings):
         }
     ]
     
-    result = await semantic_code_search("how to test")
+    result = semantic_code_search("how to test")
     assert "File: test.py" in result
     assert "def test(): pass" in result
     assert "0.95" in result
 
-@pytest.mark.asyncio
-async def test_find_usages(mock_store):
+def test_find_usages(mock_store):
     from codelens.server import find_usages
     
     mock_store.find_usages.return_value = [
@@ -51,12 +49,11 @@ async def test_find_usages(mock_store):
         }
     ]
     
-    result = await find_usages("test")
+    result = find_usages("test")
     assert "caller.py" in result
     assert "call_test" in result
 
-@pytest.mark.asyncio
-async def test_explain_function(mock_store):
+def test_explain_function(mock_store):
     from codelens.server import explain_function
     
     mock_store.get_chunk_by_symbol.return_value = {
@@ -69,6 +66,44 @@ async def test_explain_function(mock_store):
     }
     mock_store.get_calls_to.return_value = []
     
-    result = await explain_function("test.py", "test")
+    result = explain_function("test.py", "test")
     assert "Target Function" in result
     assert "def test(): pass" in result
+
+def test_exact_search(mock_store):
+    from codelens.server import exact_search
+    mock_store.exact_search.return_value = [
+        {
+            "file_path": "test.py",
+            "start_line": 1,
+            "end_line": 2,
+            "code_text": "foo = 42",
+            "symbol_name": "foo",
+            "symbol_type": "variable",
+        }
+    ]
+    
+    result = exact_search("foo = 42")
+    assert "foo = 42" in result
+
+def test_get_file_structure(mock_store):
+    from codelens.server import get_file_structure
+    mock_store.get_file_structure.return_value = [
+        {
+            "start_line": 1,
+            "end_line": 5,
+            "symbol_name": "MyClass",
+            "symbol_type": "class",
+            "parent_symbol": None
+        }
+    ]
+    result = get_file_structure("test.py")
+    assert "MyClass" in result
+    assert "Line 1-5" in result
+
+def test_get_repo_map(mock_store):
+    from codelens.server import get_repo_map
+    mock_store.get_repo_map.return_value = ["file1.py", "file2.py"]
+    result = get_repo_map()
+    assert "file1.py" in result
+    assert "file2.py" in result

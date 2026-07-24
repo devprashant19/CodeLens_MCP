@@ -2,6 +2,7 @@ import os
 import hashlib
 import click
 from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
 
 from codelens.chunker import Chunker
 from codelens.embeddings import EmbeddingService
@@ -76,39 +77,51 @@ def index(repo_path: str):
     processed_count = 0
     skipped_count = 0
     
-    for filepath in files_to_process:
-        try:
-            current_hash = get_file_hash(filepath)
-        except Exception:
-            console.print(f"[yellow]Could not read file {filepath}, skipping.[/yellow]")
-            continue
-            
-        rel_path = os.path.relpath(filepath, repo_path)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("[cyan]Indexing repository...", total=len(files_to_process))
         
-        if rel_path in existing_hashes and existing_hashes[rel_path] == current_hash:
-            skipped_count += 1
-            continue
+        for filepath in files_to_process:
+            progress.advance(task)
             
-        # File has changed or is new, delete old chunks if they exist
-        if rel_path in existing_hashes:
-            store.delete_file_chunks(rel_path)
+            try:
+                current_hash = get_file_hash(filepath)
+            except Exception:
+                progress.console.print(f"[yellow]Could not read file {filepath}, skipping.[/yellow]")
+                continue
+                
+            rel_path = os.path.relpath(filepath, repo_path)
             
-        chunks = chunker.chunk_file(filepath)
-        if not chunks:
-            continue
-            
-        # We need to update chunks with relative paths for portability
-        for chunk in chunks:
-            chunk.file_path = rel_path
-            
-        texts_to_embed = [c.code_text for c in chunks]
-        try:
-            embeddings = embedding_service.embed_chunks(texts_to_embed)
-            store.insert_chunks(chunks, embeddings, current_hash)
-            processed_count += 1
-            console.print(f"Indexed {rel_path} ({len(chunks)} chunks)")
-        except Exception as e:
-            console.print(f"[red]Error embedding chunks for {rel_path}: {e}[/red]")
+            if rel_path in existing_hashes and existing_hashes[rel_path] == current_hash:
+                skipped_count += 1
+                continue
+                
+            # File has changed or is new, delete old chunks if they exist
+            if rel_path in existing_hashes:
+                store.delete_file_chunks(rel_path)
+                
+            chunks = chunker.chunk_file(filepath)
+            if not chunks:
+                continue
+                
+            # We need to update chunks with relative paths for portability
+            for chunk in chunks:
+                chunk.file_path = rel_path
+                
+            texts_to_embed = [c.code_text for c in chunks]
+            try:
+                embeddings = embedding_service.embed_chunks(texts_to_embed)
+                store.insert_chunks(chunks, embeddings, current_hash)
+                processed_count += 1
+                progress.console.print(f"Indexed {rel_path} ({len(chunks)} chunks)")
+            except Exception as e:
+                progress.console.print(f"[red]Error embedding chunks for {rel_path}: {e}[/red]")
             
     console.print(f"[bold green]Indexing complete! processed={processed_count}, skipped={skipped_count}, deleted={deleted_count}[/bold green]")
 

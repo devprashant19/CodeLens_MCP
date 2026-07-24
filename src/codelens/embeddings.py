@@ -3,6 +3,9 @@ import time
 from typing import List, Optional
 from google import genai
 from codelens.config import config
+from codelens.logging_config import get_logger
+
+logger = get_logger("embeddings")
 
 class EmbeddingService:
     def __init__(self, api_key: Optional[str] = None):
@@ -42,13 +45,13 @@ class EmbeddingService:
                 if "429" in str(e) or "quota" in str(e).lower() or "rate" in str(e).lower():
                     if attempt == max_retries - 1:
                         raise e
-                    print(f"Rate limited by Gemini API. Retrying in {delay} seconds...")
+                    logger.warning(f"Rate limited by Gemini API. Retrying in {delay} seconds...")
                     time.sleep(delay)
                     delay *= 2  # Exponential backoff
                 elif "400" in str(e) or "invalid argument" in str(e).lower():
                     # Likely a payload too large / token limit error.
                     # We can try to truncate the texts to a safe limit.
-                    print("400 Bad Request encountered (likely token limit). Truncating chunks...")
+                    logger.warning("400 Bad Request encountered (likely token limit). Truncating chunks...")
                     texts = [t[:config.truncation_limit] for t in texts]
                 else:
                     # If it's a different error, raise immediately

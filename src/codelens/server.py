@@ -7,6 +7,9 @@ from codelens.store import Store
 from codelens.embeddings import EmbeddingService
 from codelens.observability import log_tool_call
 from codelens.config import config
+from codelens.logging_config import setup_logging
+
+logger = setup_logging()
 
 mcp = FastMCP("CodeLens MCP", dependencies=["mcp", "google-genai", "sqlite-vec"])
 

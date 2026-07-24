@@ -7,7 +7,9 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 from codelens.chunker import Chunker
 from codelens.embeddings import EmbeddingService
 from codelens.store import Store
+from codelens.logging_config import setup_logging
 
+logger = setup_logging()
 console = Console()
 
 def get_file_hash(filepath: str) -> str:
@@ -71,7 +73,7 @@ def index(repo_path: str):
     for stored_file in existing_hashes:
         if stored_file not in files_on_disk:
             store.delete_file_chunks(stored_file)
-            console.print(f"[yellow]Removed deleted file from index: {stored_file}[/yellow]")
+            logger.info(f"Removed deleted file from index: {stored_file}")
             deleted_count += 1
 
     processed_count = 0
@@ -92,8 +94,8 @@ def index(repo_path: str):
             
             try:
                 current_hash = get_file_hash(filepath)
-            except Exception:
-                progress.console.print(f"[yellow]Could not read file {filepath}, skipping.[/yellow]")
+            except Exception as e:
+                logger.warning(f"Could not read file {filepath}, skipping: {e}")
                 continue
                 
             rel_path = os.path.relpath(filepath, repo_path)
@@ -119,9 +121,9 @@ def index(repo_path: str):
                 embeddings = embedding_service.embed_chunks(texts_to_embed)
                 store.insert_chunks(chunks, embeddings, current_hash)
                 processed_count += 1
-                progress.console.print(f"Indexed {rel_path} ({len(chunks)} chunks)")
+                logger.info(f"Indexed {rel_path} ({len(chunks)} chunks)")
             except Exception as e:
-                progress.console.print(f"[red]Error embedding chunks for {rel_path}: {e}[/red]")
+                logger.error(f"Error embedding chunks for {rel_path}: {e}")
             
     console.print(f"[bold green]Indexing complete! processed={processed_count}, skipped={skipped_count}, deleted={deleted_count}[/bold green]")
 

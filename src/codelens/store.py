@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import sqlite_vec
+import threading
 from typing import List, Dict, Any, Optional
 
 from codelens.chunker import Chunk
@@ -9,18 +10,27 @@ from codelens.config import config
 class Store:
     def __init__(self, db_path: str = None):
         self.db_path = db_path or config.db_path
+        self._local = threading.local()
         self._init_db()
 
     def _get_connection(self):
-        conn = sqlite3.connect(self.db_path, timeout=10.0)
-        # Enable foreign keys and other pragmas if needed
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        # Load sqlite-vec extension
-        conn.enable_load_extension(True)
-        sqlite_vec.load(conn)
-        conn.enable_load_extension(False)
-        return conn
+        if not hasattr(self._local, "conn"):
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            # Enable foreign keys and other pragmas if needed
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            # Load sqlite-vec extension
+            conn.enable_load_extension(True)
+            sqlite_vec.load(conn)
+            conn.enable_load_extension(False)
+            self._local.conn = conn
+        return self._local.conn
+        
+    def close(self):
+        """Close the connection for the current thread."""
+        if hasattr(self._local, "conn"):
+            self._local.conn.close()
+            del self._local.conn
 
     def _init_db(self):
         with self._get_connection() as conn:

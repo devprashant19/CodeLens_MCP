@@ -1,7 +1,10 @@
 import os
-import pytest
 import tempfile
+
+import pytest
+
 from codelens.chunker import Chunker
+
 
 @pytest.fixture
 def chunker():

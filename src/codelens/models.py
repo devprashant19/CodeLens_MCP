@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+
 
 @dataclass
 class ChunkResult:
@@ -9,7 +9,7 @@ class ChunkResult:
     code_text: str
     symbol_name: str
     symbol_type: str
-    parent_symbol: Optional[str]
+    parent_symbol: str | None
 
 @dataclass
 class SearchResult(ChunkResult):
@@ -23,4 +23,4 @@ class StructureEntry:
     end_line: int
     symbol_name: str
     symbol_type: str
-    parent_symbol: Optional[str]
+    parent_symbol: str | None

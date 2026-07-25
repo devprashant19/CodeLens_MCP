@@ -1,5 +1,5 @@
-import pytest
 from codelens.chunker import Chunk
+
 
 def test_insert_and_get_hashes(store):
     chunks = [

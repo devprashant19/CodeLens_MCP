@@ -1,5 +1,5 @@
-import pytest
 from codelens.models import ChunkResult, SearchResult, StructureEntry
+
 
 def test_semantic_code_search(mock_store_service, mock_embeddings):
     from codelens.server import semantic_code_search

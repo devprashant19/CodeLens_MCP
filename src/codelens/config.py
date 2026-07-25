@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Optional
+
 
 @dataclass
 class Config:
@@ -22,6 +22,6 @@ class Config:
     tool_max_results: int = int(os.environ.get("CODELENS_TOOL_MAX_RESULTS", "20"))
     
     # API
-    api_key: Optional[str] = os.environ.get("GEMINI_API_KEY")
+    api_key: str | None = os.environ.get("GEMINI_API_KEY")
 
 config = Config()

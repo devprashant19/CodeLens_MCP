@@ -1,11 +1,11 @@
-import time
-import json
-import os
 import functools
+import json
 import logging
+import os
+import time
+from collections.abc import Callable
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
-from datetime import datetime, timezone
-from typing import Any, Callable
 
 from codelens.config import config
 
@@ -37,9 +37,7 @@ def log_tool_call(tool_name: str):
                 result = func(*args, **kwargs)
                 if isinstance(result, str):
                     result_count = 1
-                elif isinstance(result, list):
-                    result_count = len(result)
-                elif hasattr(result, "__len__"):
+                elif isinstance(result, list) or hasattr(result, "__len__"):
                     result_count = len(result)
                 else:
                     result_count = 1 if result else 0
@@ -47,7 +45,7 @@ def log_tool_call(tool_name: str):
             except Exception as e:
                 success = False
                 error_msg = str(e)
-                raise e
+                raise
             finally:
                 latency_ms = int((time.time() - start_time) * 1000)
                 
@@ -55,7 +53,7 @@ def log_tool_call(tool_name: str):
                 logged_kwargs = {k: v for k, v in kwargs.items() if k != 'self'}
                 
                 log_entry = {
-                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                     "tool_name": tool_name,
                     "input_args": logged_kwargs,
                     "latency_ms": latency_ms,

@@ -27,3 +27,5 @@ dev = [
 [project.scripts]
 codelens = "codelens.indexer:cli"
 codelens-analytics = "codelens.analytics:cli"
+[tool.ruff]
+lint.ignore = ["BLE001", "SIM102"]

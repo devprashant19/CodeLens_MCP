@@ -1,19 +1,5 @@
 import pytest
-import os
-import tempfile
-from codelens.store import Store
 from codelens.chunker import Chunk
-
-@pytest.fixture
-def store():
-    fd, path = tempfile.mkstemp(suffix=".sqlite")
-    os.close(fd)
-    
-    store = Store(db_path=path)
-    yield store
-    
-    store._get_connection().close()
-    os.remove(path)
 
 def test_insert_and_get_hashes(store):
     chunks = [
@@ -37,7 +23,7 @@ def test_find_usages_excludes_definition(store):
     
     usages = store.find_usages("my_func")
     assert len(usages) == 1
-    assert usages[0]["file_path"] == "call.py"
+    assert usages[0].file_path == "call.py"
 
 def test_delete_file_chunks(store):
     chunks = [

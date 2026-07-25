@@ -1,18 +1,18 @@
 import json
 import os
-import argparse
+import click
 from datetime import datetime, timedelta
 from collections import defaultdict
 from rich.console import Console
 from rich.table import Table
 
-LOG_FILE = "logs/tool_calls.jsonl"
+from codelens.config import config
 
 def analyze_logs(days: int = None):
     console = Console()
     
-    if not os.path.exists(LOG_FILE):
-        console.print(f"[red]Log file {LOG_FILE} not found.[/red]")
+    if not os.path.exists(config.log_file):
+        console.print(f"[red]Log file {config.log_file} not found.[/red]")
         return
         
     cutoff_date = None
@@ -31,7 +31,7 @@ def analyze_logs(days: int = None):
     # Track common queries (specifically for semantic_code_search)
     queries = defaultdict(int)
     
-    with open(LOG_FILE, "r", encoding="utf-8") as f:
+    with open(config.log_file, "r", encoding="utf-8") as f:
         for line in f:
             if not line.strip():
                 continue
@@ -106,8 +106,11 @@ def analyze_logs(days: int = None):
         for q, count in sorted_queries:
             console.print(f"- '{q}' ({count} times)")
 
+@click.command()
+@click.option("--days", type=int, default=None, help="Filter to the last N days")
+def cli(days):
+    """Analyze CodeLens MCP logs."""
+    analyze_logs(days=days)
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Analyze CodeLens MCP logs")
-    parser.add_argument("--days", type=int, default=None, help="Filter to the last N days")
-    args = parser.parse_args()
-    analyze_logs(days=args.days)
+    cli()

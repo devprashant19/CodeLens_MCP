@@ -41,11 +41,11 @@ def analyze_logs(days: int | None = None):
                 entry = json.loads(line)
                 
                 if cutoff_date:
-                    ts_str = entry.get("timestamp", "").replace("Z", "")
+                    ts_str = entry.get("timestamp", "")
                     if ts_str:
                         try:
-                            # Handle parsing ISO format
-                            entry_date = datetime.fromisoformat(ts_str)
+                            # Parse aware datetime
+                            entry_date = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                             if entry_date < cutoff_date:
                                 continue
                         except ValueError:

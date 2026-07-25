@@ -3,7 +3,7 @@ from codelens.models import ChunkResult, SearchResult, StructureEntry
 
 def test_semantic_code_search(mock_store_service, mock_embeddings):
     from codelens.server import semantic_code_search
-    
+
     mock_embeddings.embed_chunks.return_value = [[0.1, 0.2, 0.3]]
     mock_store_service.vector_search.return_value = [
         SearchResult(
@@ -18,7 +18,7 @@ def test_semantic_code_search(mock_store_service, mock_embeddings):
             relevance_score=0.95
         )
     ]
-    
+
     result = semantic_code_search("how to test")
     assert "File: test.py" in result
     assert "def test(): pass" in result
@@ -26,7 +26,7 @@ def test_semantic_code_search(mock_store_service, mock_embeddings):
 
 def test_find_usages(mock_store_service):
     from codelens.server import find_usages
-    
+
     mock_store_service.find_usages.return_value = [
         ChunkResult(
             file_path="caller.py",
@@ -38,14 +38,14 @@ def test_find_usages(mock_store_service):
             parent_symbol=None
         )
     ]
-    
+
     result = find_usages("test")
     assert "caller.py" in result
     assert "call_test" in result
 
 def test_explain_function(mock_store_service):
     from codelens.server import explain_function
-    
+
     mock_store_service.get_chunk_by_symbol.return_value = ChunkResult(
         file_path="test.py",
         start_line=1,
@@ -56,7 +56,7 @@ def test_explain_function(mock_store_service):
         parent_symbol=None
     )
     mock_store_service.get_calls_to.return_value = []
-    
+
     result = explain_function("test.py", "test")
     assert "Target Function" in result
     assert "def test(): pass" in result
@@ -74,7 +74,7 @@ def test_exact_search(mock_store_service):
             parent_symbol=None
         )
     ]
-    
+
     result = exact_search("foo = 42")
     assert "foo = 42" in result
 

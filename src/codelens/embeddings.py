@@ -23,12 +23,12 @@ class EmbeddingService:
         Handles batching and basic retry logic on rate limits (429).
         """
         all_embeddings = []
-        
+
         for i in range(0, len(texts), self.batch_size):
             batch = texts[i:i + self.batch_size]
             embeddings = self._embed_with_retry(batch)
             all_embeddings.extend(embeddings)
-            
+
         return all_embeddings
 
     def _embed_with_retry(self, texts: list[str], max_retries: int = 5) -> list[list[float]]:
@@ -45,7 +45,7 @@ class EmbeddingService:
                 # Basic check for rate limit or quota exceeded
                 if "429" in str(e) or "quota" in str(e).lower() or "rate" in str(e).lower():
                     if attempt == max_retries - 1:
-                        raise RateLimitError(f"Rate limited by Gemini API: {e}")
+                        raise RateLimitError(f"Rate limited by Gemini API: {e}") from e
                     logger.warning(f"Rate limited by Gemini API. Retrying in {delay} seconds...")
                     time.sleep(delay)
                     delay *= 2  # Exponential backoff
@@ -55,8 +55,8 @@ class EmbeddingService:
                     logger.warning("400 Bad Request encountered (likely token limit). Truncating chunks...")
                     texts = [t[:config.truncation_limit] for t in texts]
                     if attempt == max_retries - 1:
-                        raise PayloadTooLargeError("Truncation failed to resolve 400 Bad Request")
+                        raise PayloadTooLargeError("Truncation failed to resolve 400 Bad Request") from e
                 else:
                     # If it's a different error, raise immediately
-                    raise EmbeddingError(f"Embedding API failed: {e}")
+                    raise EmbeddingError(f"Embedding API failed: {e}") from e
         raise EmbeddingError("Failed to embed chunks after max retries")

@@ -4,6 +4,7 @@ from mcp.server.fastmcp import FastMCP
 from codelens.config import config
 from codelens.embeddings import EmbeddingService
 from codelens.logging_config import setup_logging
+from codelens.models import ChunkResult, SearchResult
 from codelens.observability import log_tool_call
 from codelens.store import Store
 
@@ -21,16 +22,12 @@ def get_store() -> Store:
     return _store
 
 def get_embedding_service() -> EmbeddingService | None:
+    import contextlib
     global _embedding_service
     if _embedding_service is None:
-        try:
+        with contextlib.suppress(ValueError):
             _embedding_service = EmbeddingService()
-        except ValueError:
-            # Allows the server to start, but semantic search will fail cleanly if API key is missing
-            pass
     return _embedding_service
-
-from codelens.models import ChunkResult, SearchResult
 
 
 def format_chunk_result(chunk: ChunkResult) -> str:
@@ -46,30 +43,30 @@ def format_chunk_result(chunk: ChunkResult) -> str:
 def semantic_code_search(query: str, top_k: int = 5, file_filter: str = "") -> str:
     """
     Search the codebase using semantic vector search.
-    Use this tool when you need to understand conceptual ideas, find how something works generally, 
+    Use this tool when you need to understand conceptual ideas, find how something works generally,
     or look for features by description (e.g. "how does authentication work").
     Unlike exact text matching, this understands natural language queries.
     """
     embedding_service = get_embedding_service()
     if not embedding_service:
         return "Error: GEMINI_API_KEY is not set. Semantic search is disabled."
-        
+
     top_k = max(1, min(top_k, config.tool_max_results))
-        
+
     try:
-        # We need a synchronous-looking call since embed_chunks is sync, 
+        # We need a synchronous-looking call since embed_chunks is sync,
         # but technically we might want to run it in a threadpool in a real async environment.
         # For a local MCP server, running it directly is usually fine.
         embeddings = embedding_service.embed_chunks([query])
         if not embeddings:
             return "Failed to generate embedding for query."
-            
+
         query_embedding = embeddings[0]
         results = get_store().vector_search(query_embedding, top_k=top_k, file_filter=file_filter if file_filter else None)
-        
+
         if not results:
             return "No matching code found."
-            
+
         formatted_results = [format_chunk_result(r) for r in results]
         return "\n---\n".join(formatted_results)
     except Exception as e:
@@ -86,7 +83,7 @@ def find_usages(symbol_name: str) -> str:
     results = get_store().find_usages(symbol_name)
     if not results:
         return f"No usages found for '{symbol_name}'."
-        
+
     formatted_results = [format_chunk_result(r) for r in results]
     return "\n---\n".join(formatted_results)
 
@@ -102,17 +99,17 @@ def explain_function(file_path: str, function_name: str) -> str:
     target = get_store().get_chunk_by_symbol(file_path, function_name)
     if not target:
         return f"Function '{function_name}' not found in {file_path}."
-        
+
     usages = get_store().get_calls_to(function_name)
-    
+
     response = "### Target Function\n"
     response += format_chunk_result(target)
-    
+
     if usages:
         response += "\n### Used By\n"
         for usage in usages:
             response += format_chunk_result(usage) + "\n---\n"
-            
+
     return response
 
 @mcp.tool()
@@ -127,7 +124,7 @@ def exact_search(query: str, limit: int = 10, file_filter: str = "") -> str:
     results = get_store().exact_search(query, limit=limit, file_filter=file_filter if file_filter else None)
     if not results:
         return f"No exact matches found for '{query}'."
-        
+
     formatted_results = [format_chunk_result(r) for r in results]
     return "\n---\n".join(formatted_results)
 
@@ -142,14 +139,14 @@ def get_file_structure(file_path: str) -> str:
     results = get_store().get_file_structure(file_path)
     if not results:
         return f"No parsable symbols found in {file_path}, or file does not exist."
-        
+
     response = f"### Structure of {file_path}\n"
     for r in results:
         response += f"- Line {r.start_line}-{r.end_line}: {r.symbol_type} `{r.symbol_name}`"
         if r.parent_symbol:
             response += f" (child of {r.parent_symbol})"
         response += "\n"
-        
+
     return response
 
 @mcp.tool()
@@ -162,7 +159,7 @@ def get_repo_map() -> str:
     files = get_store().get_repo_map()
     if not files:
         return "The repository is currently empty or has not been indexed."
-        
+
     response = "### Repository Map\n"
     for f in files:
         response += f"- {f}\n"

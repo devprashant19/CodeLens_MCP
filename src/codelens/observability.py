@@ -17,12 +17,12 @@ def _setup_handler():
     global _handler_setup_done
     if _handler_setup_done:
         return
-        
+
     os.makedirs(os.path.dirname(config.log_file), exist_ok=True)
     handler = RotatingFileHandler(
-        config.log_file, 
-        maxBytes=config.log_max_bytes, 
-        backupCount=config.log_backup_count, 
+        config.log_file,
+        maxBytes=config.log_max_bytes,
+        backupCount=config.log_backup_count,
         encoding="utf-8"
     )
     handler.setFormatter(logging.Formatter("%(message)s"))
@@ -38,7 +38,7 @@ def log_tool_call(tool_name: str):
             success = True
             result_count = 0
             error_msg = None
-            
+
             try:
                 result = func(*args, **kwargs)
                 if isinstance(result, str):
@@ -54,10 +54,10 @@ def log_tool_call(tool_name: str):
                 raise
             finally:
                 latency_ms = int((time.time() - start_time) * 1000)
-                
+
                 # Filter out 'self' from kwargs if present, for cleaner logging
                 logged_kwargs = {k: v for k, v in kwargs.items() if k != 'self'}
-                
+
                 log_entry = {
                     "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                     "tool_name": tool_name,
@@ -67,8 +67,8 @@ def log_tool_call(tool_name: str):
                     "result_count": result_count,
                     "error": error_msg
                 }
-                
+
                 logger.info(json.dumps(log_entry))
-                    
+
         return wrapper
     return decorator

@@ -4,7 +4,7 @@ import os
 import functools
 import logging
 from logging.handlers import RotatingFileHandler
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from codelens.config import config
@@ -55,7 +55,7 @@ def log_tool_call(tool_name: str):
                 logged_kwargs = {k: v for k, v in kwargs.items() if k != 'self'}
                 
                 log_entry = {
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                     "tool_name": tool_name,
                     "input_args": logged_kwargs,
                     "latency_ms": latency_ms,

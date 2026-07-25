@@ -23,7 +23,7 @@ def test_find_usages_excludes_definition(store):
     
     usages = store.find_usages("my_func")
     assert len(usages) == 1
-    assert usages[0]["file_path"] == "call.py"
+    assert usages[0].file_path == "call.py"
 
 def test_delete_file_chunks(store):
     chunks = [

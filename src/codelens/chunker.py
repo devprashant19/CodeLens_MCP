@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 from typing import List, Optional
-from tree_sitter_languages import get_language, get_parser
+from tree_sitter_language_pack import get_language, get_parser
 from tree_sitter import Node
 
 @dataclass
@@ -96,9 +96,13 @@ class Chunker:
                 
             # Get the exact text of the node
             # Start and end lines are 0-indexed in tree-sitter, we add 1 for standard 1-based lines
-            start_line = node.start_point[0] + 1
-            end_line = node.end_point[0] + 1
-            code_text = source_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
+            target_node = node
+            if node.parent and node.parent.type == "decorated_definition":
+                target_node = node.parent
+                
+            start_line = target_node.start_point[0] + 1
+            end_line = target_node.end_point[0] + 1
+            code_text = source_bytes[target_node.start_byte:target_node.end_byte].decode("utf-8", errors="replace")
             
             chunks.append(Chunk(
                 file_path=file_path,

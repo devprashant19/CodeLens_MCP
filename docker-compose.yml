@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  codelens:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - CODELENS_DB_PATH=/app/codelens.sqlite
+    # By default, an MCP server runs over stdio and thus doesn't expose a port
+    # But developers can use this container to run the CLI or tests
+    command: ["codelens", "--help"]

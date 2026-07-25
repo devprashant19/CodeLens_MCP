@@ -12,7 +12,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from codelens.chunker import Chunker
+from codelens.chunker import SUPPORTED_EXTENSIONS, Chunker
 from codelens.embeddings import EmbeddingService
 from codelens.logging_config import setup_logging
 from codelens.store import Store
@@ -62,7 +62,7 @@ def index(repo_path: str):
             
         for file in files:
             # Basic check for supported extensions
-            if not any(file.endswith(ext) for ext in [".py", ".js", ".ts", ".jsx", ".tsx"]):
+            if not any(file.endswith(ext) for ext in SUPPORTED_EXTENSIONS):
                 continue
                 
             filepath = os.path.join(root, file)

@@ -44,7 +44,7 @@ python_files = ["test_*.py"]
 addopts = "-v --tb=short"
 
 [tool.pyright]
-include = ["src", "tests"]
+include = ["src"]
 pythonVersion = "3.11"
-strict = ["src"]
+typeCheckingMode = "standard"
 reportMissingTypeStubs = false

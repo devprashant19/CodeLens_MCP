@@ -27,11 +27,11 @@ def mock_genai_client():
 @pytest.fixture
 def mock_store_service():
     """Provides a mocked store for higher-level tests."""
-    with patch('codelens.server.store') as mock:
-        yield mock
+    with patch('codelens.server.get_store') as mock:
+        yield mock.return_value
 
 @pytest.fixture
 def mock_embeddings():
     """Provides a mocked embedding service for higher-level tests."""
-    with patch('codelens.server.embedding_service') as mock:
-        yield mock
+    with patch('codelens.server.get_embedding_service') as mock:
+        yield mock.return_value

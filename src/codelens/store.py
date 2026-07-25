@@ -218,7 +218,7 @@ class Store:
                 FROM chunks
                 WHERE code_text LIKE ?
             """
-            params = [f"%{query}%"]
+            params: list[str | int] = [f"%{query}%"]
             if file_filter:
                 sql += " AND file_path LIKE ?"
                 params.append(f"%{file_filter}%")

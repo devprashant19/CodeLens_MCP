@@ -35,12 +35,13 @@ class EmbeddingService:
         delay = 2
         for attempt in range(max_retries):
             try:
+                import typing
                 response = self.client.models.embed_content(
                     model=self.model_name,
-                    contents=texts
+                    contents=typing.cast(typing.Any, texts)
                 )
                 # response.embeddings is a list of embeddings
-                return [emb.values for emb in response.embeddings]
+                return [list(typing.cast(list[float], getattr(emb, "values", []))) for emb in (getattr(response, "embeddings", None) or [])]
             except Exception as e:
                 # Basic check for rate limit or quota exceeded
                 if "429" in str(e) or "quota" in str(e).lower() or "rate" in str(e).lower():

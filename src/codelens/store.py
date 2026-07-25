@@ -80,6 +80,10 @@ class Store:
             cursor = conn.execute("SELECT DISTINCT file_path, file_hash FROM chunks")
             return {row[0]: row[1] for row in cursor.fetchall()}
 
+    def _make_placeholders(self, n: int) -> str:
+        """Creates a string of ? placeholders for IN clauses."""
+        return ",".join(["?"] * n)
+
     def delete_file_chunks(self, file_path: str):
         """Removes all chunks and their vectors for a given file."""
         with self._get_connection() as conn:
@@ -88,7 +92,7 @@ class Store:
             ids = [row[0] for row in cursor.fetchall()]
             
             if ids:
-                placeholders = ",".join(["?"] * len(ids))
+                placeholders = self._make_placeholders(len(ids))
                 conn.execute(f"DELETE FROM vec_chunks WHERE rowid IN ({placeholders})", ids)
                 conn.execute("DELETE FROM chunks WHERE file_path = ?", (file_path,))
             conn.commit()

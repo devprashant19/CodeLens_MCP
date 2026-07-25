@@ -11,12 +11,24 @@ logger = setup_logging()
 
 mcp = FastMCP("CodeLens MCP", dependencies=["mcp", "google-genai", "sqlite-vec"])
 
-store = Store()
-try:
-    embedding_service = EmbeddingService()
-except ValueError:
-    # Allows the server to start, but semantic search will fail cleanly if API key is missing
-    embedding_service = None
+_store = None
+_embedding_service = None
+
+def get_store() -> Store:
+    global _store
+    if _store is None:
+        _store = Store()
+    return _store
+
+def get_embedding_service() -> EmbeddingService | None:
+    global _embedding_service
+    if _embedding_service is None:
+        try:
+            _embedding_service = EmbeddingService()
+        except ValueError:
+            # Allows the server to start, but semantic search will fail cleanly if API key is missing
+            pass
+    return _embedding_service
 
 from codelens.models import ChunkResult, SearchResult
 
@@ -38,6 +50,7 @@ def semantic_code_search(query: str, top_k: int = 5, file_filter: str = "") -> s
     or look for features by description (e.g. "how does authentication work").
     Unlike exact text matching, this understands natural language queries.
     """
+    embedding_service = get_embedding_service()
     if not embedding_service:
         return "Error: GEMINI_API_KEY is not set. Semantic search is disabled."
         
@@ -52,7 +65,7 @@ def semantic_code_search(query: str, top_k: int = 5, file_filter: str = "") -> s
             return "Failed to generate embedding for query."
             
         query_embedding = embeddings[0]
-        results = store.vector_search(query_embedding, top_k=top_k, file_filter=file_filter if file_filter else None)
+        results = get_store().vector_search(query_embedding, top_k=top_k, file_filter=file_filter if file_filter else None)
         
         if not results:
             return "No matching code found."
@@ -70,7 +83,7 @@ def find_usages(symbol_name: str) -> str:
     Use this tool when you know the exact name of a symbol and want to see where else in the codebase it is called or referenced.
     This is an exact-match search, not a semantic search.
     """
-    results = store.find_usages(symbol_name)
+    results = get_store().find_usages(symbol_name)
     if not results:
         return f"No usages found for '{symbol_name}'."
         
@@ -86,11 +99,11 @@ def explain_function(file_path: str, function_name: str) -> str:
     to understand how it fits into the broader system.
     Use this when you are asked to explain what a specific function does.
     """
-    target = store.get_chunk_by_symbol(file_path, function_name)
+    target = get_store().get_chunk_by_symbol(file_path, function_name)
     if not target:
         return f"Function '{function_name}' not found in {file_path}."
         
-    usages = store.get_calls_to(function_name)
+    usages = get_store().get_calls_to(function_name)
     
     response = "### Target Function\n"
     response += format_chunk_result(target)
@@ -111,7 +124,7 @@ def exact_search(query: str, limit: int = 10, file_filter: str = "") -> str:
     This is faster and more precise than semantic search for exact matches.
     """
     limit = max(1, min(limit, config.tool_max_results))
-    results = store.exact_search(query, limit=limit, file_filter=file_filter if file_filter else None)
+    results = get_store().exact_search(query, limit=limit, file_filter=file_filter if file_filter else None)
     if not results:
         return f"No exact matches found for '{query}'."
         
@@ -126,7 +139,7 @@ def get_file_structure(file_path: str) -> str:
     Use this tool when you want to understand what a file contains without reading its entire source code.
     Returns a list of symbols and their lines.
     """
-    results = store.get_file_structure(file_path)
+    results = get_store().get_file_structure(file_path)
     if not results:
         return f"No parsable symbols found in {file_path}, or file does not exist."
         
@@ -146,7 +159,7 @@ def get_repo_map() -> str:
     Get a list of all files currently indexed in the repository.
     Use this tool when you need to see what files exist in the project to explore the codebase.
     """
-    files = store.get_repo_map()
+    files = get_store().get_repo_map()
     if not files:
         return "The repository is currently empty or has not been indexed."
         

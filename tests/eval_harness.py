@@ -218,22 +218,22 @@ def run_eval():
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         if os.path.exists(".env"):
-            with open(".env", "r") as f:
+            with open(".env") as f:
                 for line in f:
                     if line.startswith("GEMINI_API_KEY="):
                         api_key = line.split("=", 1)[1].strip()
                         break
-                        
+
     if not api_key:
         print("GEMINI_API_KEY is not set. Cannot run evaluation.")
         return
 
     client = genai.Client(api_key=api_key)
-    
+
     # We define the tools for the Gemini model
     # Note: genai SDK expects FunctionDeclaration objects, but we can pass dicts in some versions,
     # or construct them using types.FunctionDeclaration. We'll use the types module for safety.
-    
+
     tool_defs = [
         types.FunctionDeclaration(**semantic_search_schema),
         types.FunctionDeclaration(**find_usages_schema),
@@ -252,15 +252,15 @@ def run_eval():
         query = eval_item["query"]
         expected_tool = eval_item["expected_tool"]
         expected_args_keywords = eval_item["expected_args_contain"]
-        
+
         print(f"[{idx+1}/26] Evaluating: {query}")
-        
+
         try:
-            # We sleep for 12 seconds between requests to avoid the Gemini Free Tier rate limit 
+            # We sleep for 12 seconds between requests to avoid the Gemini Free Tier rate limit
             # of 5 requests per minute (which allows ~1 request every 12 seconds).
             import time
             time.sleep(12)
-            
+
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=query,
@@ -269,25 +269,25 @@ def run_eval():
                     temperature=0.0
                 )
             )
-            
+
             tool_called = None
             args = {}
             if response.function_calls:
                 fc = response.function_calls[0]
                 tool_called = fc.name
                 args = fc.args
-                
+
             tool_match = (tool_called == expected_tool)
-            
+
             # Check args
             args_str = json.dumps(args).lower()
             args_match = any(kw.lower() in args_str for kw in expected_args_keywords) if tool_called else False
-            
+
             if tool_match:
                 correct_tools += 1
             if args_match:
                 correct_args += 1
-                
+
             results.append({
                 "query": query,
                 "expected": expected_tool,
@@ -295,7 +295,7 @@ def run_eval():
                 "tool_pass": tool_match,
                 "args_pass": args_match
             })
-            
+
         except Exception as e:
             print(f"Error during eval query: {e}")
             results.append({
@@ -314,7 +314,7 @@ def run_eval():
         t_pass = "PASS" if r["tool_pass"] else "FAIL"
         a_pass = "PASS" if r["args_pass"] else "FAIL"
         print(f"| {r['query']} | {r['expected']} | {r['actual']} | {t_pass} | {a_pass} |")
-        
+
     print(f"\n**Tool Selection Accuracy:** {correct_tools}/{len(EVAL_QUERIES)} ({(correct_tools/len(EVAL_QUERIES))*100:.1f}%)")
     print(f"**Argument Extraction Accuracy:** {correct_args}/{len(EVAL_QUERIES)} ({(correct_args/len(EVAL_QUERIES))*100:.1f}%)")
 

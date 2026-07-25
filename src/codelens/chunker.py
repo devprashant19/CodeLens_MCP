@@ -32,7 +32,7 @@ class Chunker:
     def get_parser_for_ext(self, ext: str):
         if ext not in SUPPORTED_EXTENSIONS:
             return None
-        
+
         lang_name = SUPPORTED_EXTENSIONS[ext]
         if lang_name not in self.parsers:
             parser = get_parser(lang_name)
@@ -63,10 +63,10 @@ class Chunker:
         tree = parser.parse(content_bytes)
         if not tree or not tree.root_node:
             return []
-            
+
         chunks = []
         self._walk_tree(tree.root_node, content_bytes, file_path, None, chunks)
-        
+
         # If no functions/classes were found, we might want to chunk the whole file as "module",
         # but the requirements specifically said "chunk by function/class, not fixed-size text blocks".
         # We'll return what we found.
@@ -89,21 +89,18 @@ class Chunker:
 
         # If it's a valid chunkable block, add it
         if symbol_name and symbol_type:
-            if parent_symbol:
-                full_symbol_name = f"{parent_symbol}.{symbol_name}"
-            else:
-                full_symbol_name = symbol_name
-                
+            full_symbol_name = f"{parent_symbol}.{symbol_name}" if parent_symbol else symbol_name
+
             # Get the exact text of the node
             # Start and end lines are 0-indexed in tree-sitter, we add 1 for standard 1-based lines
             target_node = node
             if node.parent and node.parent.type == "decorated_definition":
                 target_node = node.parent
-                
+
             start_line = target_node.start_point[0] + 1
             end_line = target_node.end_point[0] + 1
             code_text = source_bytes[target_node.start_byte:target_node.end_byte].decode("utf-8", errors="replace")
-            
+
             chunks.append(Chunk(
                 file_path=file_path,
                 start_line=start_line,
@@ -127,7 +124,7 @@ class Chunker:
         name_node = node.child_by_field_name("name")
         if name_node:
             return source_bytes[name_node.start_byte:name_node.end_byte].decode("utf-8", errors="replace")
-            
+
         # Fallback if no field name: search for identifier children
         for child in node.children:
             if child.type in ("identifier", "property_identifier"):

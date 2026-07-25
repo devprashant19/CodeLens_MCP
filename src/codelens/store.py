@@ -27,7 +27,7 @@ class Store:
             conn.enable_load_extension(False)
             self._local.conn = conn
         return self._local.conn
-        
+
     def close(self):
         """Close the connection for the current thread."""
         if hasattr(self._local, "conn"):
@@ -50,11 +50,11 @@ class Store:
                     file_hash TEXT NOT NULL
                 )
             """)
-            
+
             # Create indices for exact lookups
             conn.execute("CREATE INDEX IF NOT EXISTS idx_file_path ON chunks(file_path)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_symbol_name ON chunks(symbol_name)")
-            
+
             # Vector table (sqlite-vec uses virtual tables)
             conn.execute(f"""
                 CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
@@ -80,15 +80,19 @@ class Store:
             cursor = conn.execute("SELECT DISTINCT file_path, file_hash FROM chunks")
             return {row[0]: row[1] for row in cursor.fetchall()}
 
+    def _make_placeholders(self, n: int) -> str:
+        """Creates a string of ? placeholders for IN clauses."""
+        return ",".join(["?"] * n)
+
     def delete_file_chunks(self, file_path: str):
         """Removes all chunks and their vectors for a given file."""
         with self._get_connection() as conn:
             # Get IDs to delete from vec_chunks
             cursor = conn.execute("SELECT id FROM chunks WHERE file_path = ?", (file_path,))
             ids = [row[0] for row in cursor.fetchall()]
-            
+
             if ids:
-                placeholders = ",".join(["?"] * len(ids))
+                placeholders = self._make_placeholders(len(ids))
                 conn.execute(f"DELETE FROM vec_chunks WHERE rowid IN ({placeholders})", ids)
                 conn.execute("DELETE FROM chunks WHERE file_path = ?", (file_path,))
             conn.commit()
@@ -97,30 +101,30 @@ class Store:
         """Inserts new chunks and their embeddings."""
         if len(chunks) != len(embeddings):
             raise ValueError("Number of chunks must match number of embeddings")
-            
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            for chunk, embedding in zip(chunks, embeddings):
+            for chunk, embedding in zip(chunks, embeddings, strict=False):
                 # Insert metadata
                 cursor.execute("""
                     INSERT INTO chunks (
-                        file_path, start_line, end_line, code_text, 
+                        file_path, start_line, end_line, code_text,
                         symbol_name, symbol_type, parent_symbol, file_hash
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     chunk.file_path, chunk.start_line, chunk.end_line, chunk.code_text,
                     chunk.symbol_name, chunk.symbol_type, chunk.parent_symbol, file_hash
                 ))
-                
+
                 chunk_id = cursor.lastrowid
-                
+
                 # Insert vector
                 # sqlite-vec expects packed bytes or a JSON array string
                 cursor.execute("""
                     INSERT INTO vec_chunks(rowid, embedding)
                     VALUES (?, ?)
                 """, (chunk_id, json.dumps(embedding)))
-                
+
             conn.commit()
 
     def vector_search(self, query_embedding: list[float], top_k: int = 5, file_filter: str | None = None) -> list[SearchResult]:
@@ -130,25 +134,25 @@ class Store:
         """
         with self._get_connection() as conn:
             query_json = json.dumps(query_embedding)
-            
+
             sql = """
-                SELECT 
-                    c.file_path, c.start_line, c.end_line, c.code_text, 
+                SELECT
+                    c.file_path, c.start_line, c.end_line, c.code_text,
                     c.symbol_name, c.symbol_type, c.parent_symbol,
                     v.distance
                 FROM vec_chunks v
                 JOIN chunks c ON c.id = v.rowid
                 WHERE v.embedding MATCH ? AND k = ?
             """
-            
+
             params = [query_json, top_k]
             if file_filter:
                 sql += " AND c.file_path LIKE ?"
                 params.append(f"%{file_filter}%")
-                
+
             sql += " ORDER BY v.distance LIMIT ?"
             params.append(top_k)
-            
+
             cursor = conn.execute(sql, params)
             results = []
             for row in cursor.fetchall():
@@ -171,55 +175,57 @@ class Store:
         """
         with self._get_connection() as conn:
             cursor = conn.execute("""
-                SELECT 
-                    file_path, start_line, end_line, code_text, 
+                SELECT
+                    file_path, start_line, end_line, code_text,
                     symbol_name, symbol_type, parent_symbol
-                FROM chunks 
+                FROM chunks
                 WHERE code_text LIKE ? AND symbol_name != ? AND symbol_name NOT LIKE ?
             """, (f"%{symbol_name}%", symbol_name, f"%.{symbol_name}"))
-            
+
             return [self._row_to_chunk_result(row) for row in cursor.fetchall()]
 
     def get_chunk_by_symbol(self, file_path: str, symbol_name: str) -> ChunkResult | None:
         """Get a specific chunk by its defined symbol name and file."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
-                SELECT 
-                    file_path, start_line, end_line, code_text, 
+                SELECT
+                    file_path, start_line, end_line, code_text,
                     symbol_name, symbol_type, parent_symbol
-                FROM chunks 
+                FROM chunks
                 WHERE file_path = ? AND (symbol_name = ? OR symbol_name LIKE ?)
                 LIMIT 1
             """, (file_path, symbol_name, f"%.{symbol_name}"))
-            
+
             row = cursor.fetchone()
             if not row:
                 return None
-                
+
             return self._row_to_chunk_result(row)
 
     def get_calls_to(self, symbol_name: str) -> list[ChunkResult]:
         """Return chunks that contain calls to the given symbol (similar to usages)."""
         return self.find_usages(symbol_name)
 
-    def exact_search(self, query: str, limit: int = 10, file_filter: str | None = None) -> list[ChunkResult]:
+    def exact_search(
+        self, query: str, limit: int = 10, file_filter: str | None = None
+    ) -> list[ChunkResult]:
         """Exact text match search across the codebase."""
         with self._get_connection() as conn:
             sql = """
-                SELECT 
-                    file_path, start_line, end_line, code_text, 
+                SELECT
+                    file_path, start_line, end_line, code_text,
                     symbol_name, symbol_type, parent_symbol
-                FROM chunks 
+                FROM chunks
                 WHERE code_text LIKE ?
             """
-            params = [f"%{query}%"]
+            params: list[str | int] = [f"%{query}%"]
             if file_filter:
                 sql += " AND file_path LIKE ?"
                 params.append(f"%{file_filter}%")
-                
+
             sql += " LIMIT ?"
             params.append(limit)
-            
+
             cursor = conn.execute(sql, params)
             return [self._row_to_chunk_result(row) for row in cursor.fetchall()]
 
@@ -227,14 +233,14 @@ class Store:
         """Returns all symbols defined in a file without the full code text to save context."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
-                SELECT 
-                    file_path, start_line, end_line, 
+                SELECT
+                    file_path, start_line, end_line,
                     symbol_name, symbol_type, parent_symbol
-                FROM chunks 
+                FROM chunks
                 WHERE file_path = ?
                 ORDER BY start_line
             """, (file_path,))
-            
+
             results = []
             for row in cursor.fetchall():
                 results.append(StructureEntry(

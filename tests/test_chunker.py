@@ -29,11 +29,11 @@ class MyClass:
     try:
         chunks = chunker.chunk_file(path)
         assert len(chunks) == 3
-        
+
         # We should find hello_world, MyClass, and MyClass.method_one
         names = {c.symbol_name for c in chunks}
         assert names == {"hello_world", "MyClass", "MyClass.method_one"}
-        
+
         # Check parents
         method_chunk = next(c for c in chunks if c.symbol_name == "MyClass.method_one")
         assert method_chunk.parent_symbol == "MyClass"
@@ -77,7 +77,7 @@ def test_chunker_empty_and_syntax_error(chunker):
     path_error = create_temp_file("def broken_syntax( {", ".py")
     try:
         assert len(chunker.chunk_file(path_empty)) == 0
-        
+
         # Syntax error file should not crash, it might just return 0 chunks
         chunks = chunker.chunk_file(path_error)
         assert isinstance(chunks, list)

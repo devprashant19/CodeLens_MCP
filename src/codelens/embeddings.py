@@ -3,7 +3,7 @@ import time
 from google import genai
 
 from codelens.config import config
-from codelens.exceptions import EmbeddingError, RateLimitError
+from codelens.exceptions import EmbeddingError, PayloadTooLargeError, RateLimitError
 from codelens.logging_config import get_logger
 
 logger = get_logger("embeddings")
@@ -23,29 +23,30 @@ class EmbeddingService:
         Handles batching and basic retry logic on rate limits (429).
         """
         all_embeddings = []
-        
+
         for i in range(0, len(texts), self.batch_size):
             batch = texts[i:i + self.batch_size]
             embeddings = self._embed_with_retry(batch)
             all_embeddings.extend(embeddings)
-            
+
         return all_embeddings
 
     def _embed_with_retry(self, texts: list[str], max_retries: int = 5) -> list[list[float]]:
         delay = 2
         for attempt in range(max_retries):
             try:
+                import typing
                 response = self.client.models.embed_content(
                     model=self.model_name,
-                    contents=texts
+                    contents=typing.cast(typing.Any, texts)
                 )
                 # response.embeddings is a list of embeddings
-                return [emb.values for emb in response.embeddings]
+                return [list(typing.cast(list[float], getattr(emb, "values", []))) for emb in (getattr(response, "embeddings", None) or [])]
             except Exception as e:
                 # Basic check for rate limit or quota exceeded
                 if "429" in str(e) or "quota" in str(e).lower() or "rate" in str(e).lower():
                     if attempt == max_retries - 1:
-                        raise RateLimitError(f"Rate limited by Gemini API: {e}")
+                        raise RateLimitError(f"Rate limited by Gemini API: {e}") from e
                     logger.warning(f"Rate limited by Gemini API. Retrying in {delay} seconds...")
                     time.sleep(delay)
                     delay *= 2  # Exponential backoff
@@ -54,7 +55,9 @@ class EmbeddingService:
                     # We can try to truncate the texts to a safe limit.
                     logger.warning("400 Bad Request encountered (likely token limit). Truncating chunks...")
                     texts = [t[:config.truncation_limit] for t in texts]
+                    if attempt == max_retries - 1:
+                        raise PayloadTooLargeError("Truncation failed to resolve 400 Bad Request") from e
                 else:
                     # If it's a different error, raise immediately
-                    raise EmbeddingError(f"Embedding API failed: {e}")
+                    raise EmbeddingError(f"Embedding API failed: {e}") from e
         raise EmbeddingError("Failed to embed chunks after max retries")

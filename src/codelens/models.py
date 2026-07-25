@@ -2,14 +2,17 @@ from dataclasses import dataclass
 
 
 @dataclass
-class ChunkResult:
+class SymbolLocation:
     file_path: str
     start_line: int
     end_line: int
-    code_text: str
     symbol_name: str
     symbol_type: str
     parent_symbol: str | None
+
+@dataclass
+class ChunkResult(SymbolLocation):
+    code_text: str
 
 @dataclass
 class SearchResult(ChunkResult):
@@ -17,10 +20,5 @@ class SearchResult(ChunkResult):
     relevance_score: float
 
 @dataclass
-class StructureEntry:
-    file_path: str
-    start_line: int
-    end_line: int
-    symbol_name: str
-    symbol_type: str
-    parent_symbol: str | None
+class StructureEntry(SymbolLocation):
+    pass

@@ -3,7 +3,7 @@ import time
 from google import genai
 
 from codelens.config import config
-from codelens.exceptions import EmbeddingError, RateLimitError
+from codelens.exceptions import EmbeddingError, PayloadTooLargeError, RateLimitError
 from codelens.logging_config import get_logger
 
 logger = get_logger("embeddings")
@@ -54,6 +54,8 @@ class EmbeddingService:
                     # We can try to truncate the texts to a safe limit.
                     logger.warning("400 Bad Request encountered (likely token limit). Truncating chunks...")
                     texts = [t[:config.truncation_limit] for t in texts]
+                    if attempt == max_retries - 1:
+                        raise PayloadTooLargeError("Truncation failed to resolve 400 Bad Request")
                 else:
                     # If it's a different error, raise immediately
                     raise EmbeddingError(f"Embedding API failed: {e}")

@@ -1,15 +1,16 @@
-import sqlite3
 import json
-import sqlite_vec
+import sqlite3
 import threading
-from typing import List, Dict, Any, Optional, Union
+
+import sqlite_vec
 
 from codelens.chunker import Chunk
 from codelens.config import config
 from codelens.models import ChunkResult, SearchResult, StructureEntry
 
+
 class Store:
-    def __init__(self, db_path: str = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or config.db_path
         self._local = threading.local()
         self._init_db()
@@ -55,11 +56,11 @@ class Store:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_symbol_name ON chunks(symbol_name)")
             
             # Vector table (sqlite-vec uses virtual tables)
-            conn.execute("""
+            conn.execute(f"""
                 CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
-                    embedding float[%s]
+                    embedding float[{config.embedding_dim}]
                 )
-            """ % config.embedding_dim)
+            """)
             conn.commit()
 
     def _row_to_chunk_result(self, row: tuple) -> ChunkResult:
@@ -73,7 +74,7 @@ class Store:
             parent_symbol=row[6]
         )
 
-    def get_file_hashes(self) -> Dict[str, str]:
+    def get_file_hashes(self) -> dict[str, str]:
         """Returns a mapping of file_path -> file_hash for incremental indexing."""
         with self._get_connection() as conn:
             cursor = conn.execute("SELECT DISTINCT file_path, file_hash FROM chunks")
@@ -92,7 +93,7 @@ class Store:
                 conn.execute("DELETE FROM chunks WHERE file_path = ?", (file_path,))
             conn.commit()
 
-    def insert_chunks(self, chunks: List[Chunk], embeddings: List[List[float]], file_hash: str):
+    def insert_chunks(self, chunks: list[Chunk], embeddings: list[list[float]], file_hash: str):
         """Inserts new chunks and their embeddings."""
         if len(chunks) != len(embeddings):
             raise ValueError("Number of chunks must match number of embeddings")
@@ -122,7 +123,7 @@ class Store:
                 
             conn.commit()
 
-    def vector_search(self, query_embedding: List[float], top_k: int = 5, file_filter: Optional[str] = None) -> List[SearchResult]:
+    def vector_search(self, query_embedding: list[float], top_k: int = 5, file_filter: str | None = None) -> list[SearchResult]:
         """
         Cosine similarity search using sqlite-vec.
         Returns ranked chunks.
@@ -164,7 +165,7 @@ class Store:
                 ))
             return results
 
-    def find_usages(self, symbol_name: str) -> List[ChunkResult]:
+    def find_usages(self, symbol_name: str) -> list[ChunkResult]:
         """
         Exact text/AST reference matching.
         """
@@ -179,7 +180,7 @@ class Store:
             
             return [self._row_to_chunk_result(row) for row in cursor.fetchall()]
 
-    def get_chunk_by_symbol(self, file_path: str, symbol_name: str) -> Optional[ChunkResult]:
+    def get_chunk_by_symbol(self, file_path: str, symbol_name: str) -> ChunkResult | None:
         """Get a specific chunk by its defined symbol name and file."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
@@ -197,11 +198,11 @@ class Store:
                 
             return self._row_to_chunk_result(row)
 
-    def get_calls_to(self, symbol_name: str) -> List[ChunkResult]:
+    def get_calls_to(self, symbol_name: str) -> list[ChunkResult]:
         """Return chunks that contain calls to the given symbol (similar to usages)."""
         return self.find_usages(symbol_name)
 
-    def exact_search(self, query: str, limit: int = 10, file_filter: Optional[str] = None) -> List[ChunkResult]:
+    def exact_search(self, query: str, limit: int = 10, file_filter: str | None = None) -> list[ChunkResult]:
         """Exact text match search across the codebase."""
         with self._get_connection() as conn:
             sql = """
@@ -222,7 +223,7 @@ class Store:
             cursor = conn.execute(sql, params)
             return [self._row_to_chunk_result(row) for row in cursor.fetchall()]
 
-    def get_file_structure(self, file_path: str) -> List[StructureEntry]:
+    def get_file_structure(self, file_path: str) -> list[StructureEntry]:
         """Returns all symbols defined in a file without the full code text to save context."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
@@ -246,7 +247,7 @@ class Store:
                 ))
             return results
 
-    def get_repo_map(self) -> List[str]:
+    def get_repo_map(self) -> list[str]:
         """Returns all unique indexed file paths."""
         with self._get_connection() as conn:
             cursor = conn.execute("SELECT DISTINCT file_path FROM chunks ORDER BY file_path")

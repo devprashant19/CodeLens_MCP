@@ -1,23 +1,25 @@
 import json
 import os
-import click
-from datetime import datetime, timedelta
 from collections import defaultdict
+from datetime import UTC, datetime, timedelta
+
+import click
 from rich.console import Console
 from rich.table import Table
 
 from codelens.config import config
 
-def analyze_logs(days: int = None):
+
+def analyze_logs(days: int | None = None):
     console = Console()
     
     if not os.path.exists(config.log_file):
-        console.print(f"[red]Log file {config.log_file} not found.[/red]")
+        console.print(f"[red]Log file not found at {config.log_file}[/red]")
         return
         
     cutoff_date = None
     if days is not None:
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days)
         console.print(f"[cyan]Filtering logs to the last {days} days (since {cutoff_date.date()})[/cyan]")
         
     total_calls = 0
@@ -74,7 +76,7 @@ def analyze_logs(days: int = None):
         
     # Overall summary
     overall_success_rate = (success_calls / total_calls) * 100
-    console.print(f"\n[bold]Overall Metrics[/bold]")
+    console.print("\n[bold]Overall Metrics[/bold]")
     console.print(f"Total Calls: {total_calls}")
     console.print(f"Overall Success Rate: {overall_success_rate:.1f}%")
     

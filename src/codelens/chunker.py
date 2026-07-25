@@ -1,8 +1,9 @@
 import os
 from dataclasses import dataclass
-from typing import List, Optional
-from tree_sitter_language_pack import get_language, get_parser
+
 from tree_sitter import Node
+from tree_sitter_language_pack import get_parser
+
 
 @dataclass
 class Chunk:
@@ -12,7 +13,7 @@ class Chunk:
     code_text: str
     symbol_name: str
     symbol_type: str
-    parent_symbol: Optional[str]
+    parent_symbol: str | None
 
 # Mapping of file extensions to tree-sitter language names
 SUPPORTED_EXTENSIONS = {
@@ -34,12 +35,11 @@ class Chunker:
         
         lang_name = SUPPORTED_EXTENSIONS[ext]
         if lang_name not in self.parsers:
-            language = get_language(lang_name)
             parser = get_parser(lang_name)
             self.parsers[lang_name] = parser
         return self.parsers[lang_name]
 
-    def chunk_file(self, file_path: str) -> List[Chunk]:
+    def chunk_file(self, file_path: str) -> list[Chunk]:
         """
         Parses a file and returns a list of Chunks.
         If a file contains syntax errors, we attempt to parse it anyway (tree-sitter is resilient),
@@ -72,7 +72,7 @@ class Chunker:
         # We'll return what we found.
         return chunks
 
-    def _walk_tree(self, node: Node, source_bytes: bytes, file_path: str, parent_symbol: Optional[str], chunks: List[Chunk]):
+    def _walk_tree(self, node: Node, source_bytes: bytes, file_path: str, parent_symbol: str | None, chunks: list[Chunk]):
         symbol_name = None
         symbol_type = None
 
@@ -121,7 +121,7 @@ class Chunker:
         for child in node.children:
             self._walk_tree(child, source_bytes, file_path, parent_symbol, chunks)
 
-    def _get_node_name(self, node: Node, source_bytes: bytes) -> Optional[str]:
+    def _get_node_name(self, node: Node, source_bytes: bytes) -> str | None:
         # Typically, the name is an identifier child
         # tree-sitter python/js puts the name as a named child often called 'name'
         name_node = node.child_by_field_name("name")

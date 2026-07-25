@@ -1,15 +1,15 @@
-import os
 import time
-from typing import List, Optional
+
 from google import genai
+
 from codelens.config import config
+from codelens.exceptions import EmbeddingError, RateLimitError
 from codelens.logging_config import get_logger
-from codelens.exceptions import EmbeddingError, RateLimitError, PayloadTooLargeError
 
 logger = get_logger("embeddings")
 
 class EmbeddingService:
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         self.api_key = api_key or config.api_key
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY environment variable is missing")
@@ -17,7 +17,7 @@ class EmbeddingService:
         self.model_name = config.embedding_model
         self.batch_size = config.embedding_batch_size
 
-    def embed_chunks(self, texts: List[str]) -> List[List[float]]:
+    def embed_chunks(self, texts: list[str]) -> list[list[float]]:
         """
         Embed a list of texts using the Gemini API.
         Handles batching and basic retry logic on rate limits (429).
@@ -31,7 +31,7 @@ class EmbeddingService:
             
         return all_embeddings
 
-    def _embed_with_retry(self, texts: List[str], max_retries: int = 5) -> List[List[float]]:
+    def _embed_with_retry(self, texts: list[str], max_retries: int = 5) -> list[list[float]]:
         delay = 2
         for attempt in range(max_retries):
             try:

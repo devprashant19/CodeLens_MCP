@@ -1,13 +1,11 @@
-import os
-from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from codelens.store import Store
-from codelens.embeddings import EmbeddingService
-from codelens.observability import log_tool_call
 from codelens.config import config
+from codelens.embeddings import EmbeddingService
 from codelens.logging_config import setup_logging
+from codelens.observability import log_tool_call
+from codelens.store import Store
 
 logger = setup_logging()
 
@@ -21,6 +19,7 @@ except ValueError:
     embedding_service = None
 
 from codelens.models import ChunkResult, SearchResult
+
 
 def format_chunk_result(chunk: ChunkResult) -> str:
     res = f"File: {chunk.file_path} (Lines {chunk.start_line}-{chunk.end_line})\n"
@@ -61,7 +60,7 @@ def semantic_code_search(query: str, top_k: int = 5, file_filter: str = "") -> s
         formatted_results = [format_chunk_result(r) for r in results]
         return "\n---\n".join(formatted_results)
     except Exception as e:
-        return f"Search failed: {str(e)}"
+        return f"Search failed: {e!s}"
 
 @mcp.tool()
 @log_tool_call("find_usages")

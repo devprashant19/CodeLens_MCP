@@ -1,13 +1,21 @@
-import os
 import hashlib
+import os
+
 import click
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeRemainingColumn,
+)
 
 from codelens.chunker import Chunker
 from codelens.embeddings import EmbeddingService
-from codelens.store import Store
 from codelens.logging_config import setup_logging
+from codelens.store import Store
 
 logger = setup_logging()
 console = Console()
@@ -27,7 +35,6 @@ def is_ignored(filepath: str) -> bool:
 @click.group()
 def cli():
     """CodeLens MCP CLI"""
-    pass
 
 @cli.command()
 @click.argument('repo_path', type=click.Path(exists=True, file_okay=False, dir_okay=True))

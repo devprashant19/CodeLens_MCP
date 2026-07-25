@@ -1,6 +1,7 @@
 import logging
 import sys
 
+
 def setup_logging():
     """Configure basic structured logging for the application."""
     logger = logging.getLogger("codelens")

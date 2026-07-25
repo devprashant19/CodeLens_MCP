@@ -1,6 +1,7 @@
-import pytest
 from unittest.mock import MagicMock
+
 from codelens.embeddings import EmbeddingService
+
 
 def test_embed_chunks_batching(mock_genai_client):
     service = EmbeddingService(api_key="fake")

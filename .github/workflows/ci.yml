@@ -57,4 +57,4 @@ jobs:
         
     - name: Type check with Pyright
       run: |
-        pyright src/ tests/
+        pyright
